@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title + ' - ' : '' %>Prayer Times</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul>
+        <li><strong>Prayer Times</strong></li>
+      </ul>
+      <ul>
+        <li><a href="/">Dashboard</a></li>
+        <li><a href="/zones/new">Add Zone</a></li>
+        <li><a href="/log">Activity Log</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    <%- body %>
+  </main>
+  <footer class="container">
+    <small>Soundtrack Prayer Times Scheduler</small>
+  </footer>
+</body>
+</html>

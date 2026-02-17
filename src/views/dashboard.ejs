@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Prayer Times</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul><li><strong>Prayer Times</strong></li></ul>
+      <ul>
+        <li><a href="/">Dashboard</a></li>
+        <li><a href="/zones/new">Add Zone</a></li>
+        <li><a href="/log">Activity Log</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    <hgroup>
+      <h1>Dashboard</h1>
+      <p>Scheduler: <%= schedulerStatus.activeZones %> zone(s) active, <%= schedulerStatus.activeTimeouts %> action(s) scheduled</p>
+    </hgroup>
+
+    <div style="margin-bottom: 1rem; text-align: right;">
+      <a href="/zones/new" role="button">Add Zone</a>
+      <button class="secondary outline" onclick="fetch('/api/refresh',{method:'POST'}).then(()=>location.reload())" style="margin-left: 0.5rem;">Refresh Schedules</button>
+    </div>
+
+    <% if (zones.length === 0) { %>
+      <p>No zones configured yet. <a href="/zones/new">Add your first zone.</a></p>
+    <% } else { %>
+    <figure>
+      <table>
+        <thead>
+          <tr>
+            <th>Zone</th>
+            <th>Account</th>
+            <th>Location</th>
+            <th>Prayers</th>
+            <th>Duration</th>
+            <th>Mode</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% for (const z of zones) { %>
+          <tr>
+            <td><%= z.zone_name %></td>
+            <td><%= z.account_name %></td>
+            <td><%= z.city %>, <%= z.country %></td>
+            <td><%= z.prayers %></td>
+            <td><%= z.pause_duration_minutes %> min</td>
+            <td><%= z.mode %></td>
+            <td>
+              <% if (!z.enabled) { %>
+                <span style="color: orange;">Disabled</span>
+              <% } else if (z.last_action && z.last_action.success) { %>
+                <span style="color: green;">OK</span>
+              <% } else if (z.last_action && !z.last_action.success) { %>
+                <span style="color: red;">Failed</span>
+              <% } else { %>
+                <span style="color: gray;">Pending</span>
+              <% } %>
+            </td>
+            <td><a href="/zones/<%= z.id %>/edit">Edit</a></td>
+          </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </figure>
+    <% } %>
+  </main>
+</body>
+</html>

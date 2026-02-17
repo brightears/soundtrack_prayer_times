@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activity Log - Prayer Times</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul><li><strong>Prayer Times</strong></li></ul>
+      <ul>
+        <li><a href="/">Dashboard</a></li>
+        <li><a href="/zones/new">Add Zone</a></li>
+        <li><a href="/log">Activity Log</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    <h1>Activity Log</h1>
+
+    <% if (logs.length === 0) { %>
+      <p>No activity yet. Actions will appear here once the scheduler runs.</p>
+    <% } else { %>
+    <figure>
+      <table>
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Zone</th>
+            <th>Account</th>
+            <th>Action</th>
+            <th>Prayer</th>
+            <th>Result</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% for (const log of logs) { %>
+          <tr>
+            <td><%= new Date(log.executed_at).toLocaleString() %></td>
+            <td><%= log.zone_name %></td>
+            <td><%= log.account_name %></td>
+            <td><%= log.action %></td>
+            <td><%= log.prayer %></td>
+            <td>
+              <% if (log.success) { %>
+                <span style="color: green;">OK</span>
+              <% } else { %>
+                <span style="color: red;">Failed</span>
+              <% } %>
+            </td>
+            <td><%= log.error_message || '' %></td>
+          </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </figure>
+    <% } %>
+  </main>
+</body>
+</html>

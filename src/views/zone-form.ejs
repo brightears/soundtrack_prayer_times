@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= zone ? 'Edit' : 'Add' %> Zone - Prayer Times</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+  <header class="container">
+    <nav>
+      <ul><li><strong>Prayer Times</strong></li></ul>
+      <ul>
+        <li><a href="/">Dashboard</a></li>
+        <li><a href="/zones/new">Add Zone</a></li>
+        <li><a href="/log">Activity Log</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main class="container">
+    <h1><%= zone ? 'Edit' : 'Add' %> Zone</h1>
+
+    <% if (error) { %>
+      <article style="background: #fee; border-left: 4px solid red; padding: 1rem;">
+        <%= error %>
+      </article>
+    <% } %>
+
+    <form method="POST" action="<%= zone ? '/zones/' + zone.id + '/update' : '/zones/create' %>" id="zone-form">
+
+      <% if (!zone) { %>
+      <!-- Soundtrack Account Selection -->
+      <fieldset>
+        <legend>Soundtrack Zone</legend>
+
+        <label>Account
+          <select name="account_id" id="account-select"
+            hx-get="/api/soundtrack/accounts"
+            hx-trigger="load"
+            hx-target="#account-options"
+            hx-swap="innerHTML">
+            <option value="">Loading accounts...</option>
+          </select>
+          <template id="account-options"></template>
+        </label>
+
+        <label>Zone
+          <select name="zone_id" id="zone-select" disabled>
+            <option value="">Select an account first</option>
+          </select>
+        </label>
+
+        <input type="hidden" name="account_name" id="account-name">
+        <input type="hidden" name="location_id" id="location-id">
+        <input type="hidden" name="location_name" id="location-name">
+        <input type="hidden" name="zone_name" id="zone-name">
+      </fieldset>
+      <% } else { %>
+        <p><strong>Zone:</strong> <%= zone.zone_name %> (<%= zone.account_name %>)</p>
+      <% } %>
+
+      <!-- Location for Prayer Times -->
+      <fieldset>
+        <legend>Prayer Time Location</legend>
+
+        <div class="grid">
+          <label>City
+            <input type="text" name="city" value="<%= zone ? zone.city : '' %>" required placeholder="e.g. Bangkok">
+          </label>
+          <label>Country
+            <input type="text" name="country" value="<%= zone ? zone.country : '' %>" required placeholder="e.g. Thailand">
+          </label>
+        </div>
+
+        <label>Timezone
+          <select name="timezone" required>
+            <option value="">Select timezone</option>
+            <% const timezones = [
+              'Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura',
+              'Asia/Kuala_Lumpur', 'Asia/Singapore',
+              'Asia/Bangkok', 'Asia/Ho_Chi_Minh',
+              'Asia/Manila', 'Asia/Phnom_Penh',
+              'Asia/Yangon', 'Asia/Kolkata',
+              'Asia/Dubai', 'Asia/Riyadh', 'Asia/Qatar',
+              'Asia/Karachi', 'Asia/Dhaka',
+              'Asia/Tokyo', 'Asia/Seoul', 'Asia/Shanghai',
+              'Asia/Hong_Kong', 'Asia/Taipei',
+              'Europe/Istanbul', 'Europe/London', 'Europe/Paris',
+              'Africa/Cairo', 'Africa/Casablanca',
+              'America/New_York', 'America/Los_Angeles',
+              'Australia/Sydney', 'Pacific/Auckland'
+            ]; %>
+            <% for (const tz of timezones) { %>
+              <option value="<%= tz %>" <%= zone && zone.timezone === tz ? 'selected' : '' %>><%= tz %></option>
+            <% } %>
+          </select>
+        </label>
+
+        <div class="grid">
+          <label>Calculation Method
+            <select name="method" required>
+              <% for (const [id, name] of Object.entries(methods)) { %>
+                <option value="<%= id %>" <%= zone && zone.method === Number(id) ? 'selected' : (!zone && id === '4' ? 'selected' : '') %>><%= name %></option>
+              <% } %>
+            </select>
+          </label>
+          <label>Asr Calculation
+            <select name="asr_school">
+              <option value="0" <%= !zone || zone.asr_school === 0 ? 'selected' : '' %>>Shafi'i (standard)</option>
+              <option value="1" <%= zone && zone.asr_school === 1 ? 'selected' : '' %>>Hanafi</option>
+            </select>
+          </label>
+        </div>
+      </fieldset>
+
+      <!-- Schedule Settings -->
+      <fieldset>
+        <legend>Schedule Settings</legend>
+
+        <label>Prayers to Pause For</label>
+        <% const allPrayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+           const enabledPrayers = zone ? zone.prayers.split(',').map(p => p.trim()) : allPrayers; %>
+        <div class="grid" style="grid-template-columns: repeat(5, 1fr);">
+          <% for (const prayer of allPrayers) { %>
+            <label>
+              <input type="checkbox" name="prayer_<%= prayer %>" value="1"
+                <%= enabledPrayers.includes(prayer) ? 'checked' : '' %>>
+              <%= prayer %>
+            </label>
+          <% } %>
+        </div>
+
+        <div class="grid">
+          <label>Pause Duration (minutes)
+            <input type="number" name="pause_duration_minutes" min="5" max="60"
+              value="<%= zone ? zone.pause_duration_minutes : 20 %>">
+          </label>
+          <label>Pause Before Prayer (minutes)
+            <input type="number" name="pause_offset_minutes" min="0" max="30"
+              value="<%= zone ? zone.pause_offset_minutes : 0 %>">
+          </label>
+        </div>
+
+        <div class="grid">
+          <label>Mode
+            <select name="mode">
+              <option value="year-round" <%= !zone || zone.mode === 'year-round' ? 'selected' : '' %>>Year-round</option>
+              <option value="ramadan-only" <%= zone && zone.mode === 'ramadan-only' ? 'selected' : '' %>>Ramadan only</option>
+            </select>
+          </label>
+          <label>Enabled
+            <select name="enabled">
+              <option value="true" <%= !zone || zone.enabled ? 'selected' : '' %>>Yes</option>
+              <option value="false" <%= zone && !zone.enabled ? 'selected' : '' %>>No</option>
+            </select>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="grid">
+        <button type="submit"><%= zone ? 'Save Changes' : 'Add Zone' %></button>
+        <% if (zone) { %>
+          <button type="button" class="secondary" onclick="if(confirm('Delete this zone config?')) fetch('/api/zones/<%= zone.id %>', {method:'DELETE'}).then(()=>location.href='/')">Delete</button>
+        <% } %>
+        <a href="/" role="button" class="outline">Cancel</a>
+      </div>
+    </form>
+  </main>
+
+  <script>
+    // Handle account selection -> load zones
+    document.addEventListener('DOMContentLoaded', () => {
+      const accountSelect = document.getElementById('account-select');
+      const zoneSelect = document.getElementById('zone-select');
+      if (!accountSelect || !zoneSelect) return;
+
+      // Load accounts into dropdown
+      fetch('/api/soundtrack/accounts')
+        .then(r => r.json())
+        .then(accounts => {
+          accountSelect.innerHTML = '<option value="">Select account...</option>' +
+            accounts.map(a => '<option value="' + a.id + '">' + a.name + '</option>').join('');
+        });
+
+      // When account changes, load zones
+      accountSelect.addEventListener('change', () => {
+        const accountId = accountSelect.value;
+        if (!accountId) {
+          zoneSelect.innerHTML = '<option value="">Select an account first</option>';
+          zoneSelect.disabled = true;
+          return;
+        }
+
+        document.getElementById('account-name').value =
+          accountSelect.options[accountSelect.selectedIndex].text;
+
+        zoneSelect.innerHTML = '<option value="">Loading zones...</option>';
+        zoneSelect.disabled = true;
+
+        fetch('/api/soundtrack/accounts/' + accountId + '/zones')
+          .then(r => r.json())
+          .then(zones => {
+            zoneSelect.innerHTML = '<option value="">Select zone...</option>' +
+              zones.map(z =>
+                '<option value="' + z.id + '" data-location-id="' + z.locationId +
+                '" data-location-name="' + z.locationName + '" data-zone-name="' + z.name + '">' +
+                z.locationName + ' / ' + z.name + (z.isPaired ? '' : ' (unpaired)') +
+                '</option>'
+              ).join('');
+            zoneSelect.disabled = false;
+          });
+      });
+
+      // When zone changes, fill hidden fields
+      zoneSelect.addEventListener('change', () => {
+        const opt = zoneSelect.options[zoneSelect.selectedIndex];
+        document.getElementById('location-id').value = opt.dataset.locationId || '';
+        document.getElementById('location-name').value = opt.dataset.locationName || '';
+        document.getElementById('zone-name').value = opt.dataset.zoneName || '';
+      });
+    });
+  </script>
+</body>
+</html>

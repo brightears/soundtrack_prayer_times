@@ -1,0 +1,34 @@
+{
+  "name": "soundtrack-prayertimes",
+  "version": "1.0.0",
+  "description": "Automatically pause and resume Soundtrack music zones during Islamic prayer times",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/server.js"
+  },
+  "keywords": [
+    "soundtrack",
+    "prayer-times",
+    "ramadan",
+    "music",
+    "scheduler"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "ejs": "^3.1.10",
+    "express": "^5.1.0",
+    "node-cron": "^3.0.3",
+    "pg": "^8.13.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.2",
+    "@types/node": "^22.15.0",
+    "@types/node-cron": "^3.0.11",
+    "@types/pg": "^8.11.11",
+    "typescript": "^5.8.3"
+  }
+}
