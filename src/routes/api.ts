@@ -6,7 +6,7 @@ import {
   ACCOUNT_LOCATIONS,
   LOCATION_SOUND_ZONES,
 } from "../queries.js";
-import { refreshZone, refreshAllSchedules } from "../scheduler.js";
+import { refreshZone, refreshAllSchedules, testZone } from "../scheduler.js";
 
 const router = Router();
 
@@ -66,16 +66,18 @@ router.post(
       asr_school,
       prayers,
       pause_offset_minutes,
-      pause_duration_minutes,
+      pause_durations,
       mode,
       enabled,
     } = req.body;
+
+    const defaultDurations = { Fajr: 15, Dhuhr: 20, Asr: 15, Maghrib: 15, Isha: 20 };
 
     const result = await query(
       `INSERT INTO zone_configs
        (account_id, account_name, location_id, location_name, zone_id, zone_name,
         city, country, latitude, longitude, timezone, method, asr_school,
-        prayers, pause_offset_minutes, pause_duration_minutes, mode, enabled)
+        prayers, pause_offset_minutes, pause_durations, mode, enabled)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        RETURNING *`,
       [
@@ -94,7 +96,7 @@ router.post(
         asr_school ?? 0,
         prayers ?? "Fajr,Dhuhr,Asr,Maghrib,Isha",
         pause_offset_minutes ?? 0,
-        pause_duration_minutes ?? 20,
+        JSON.stringify(pause_durations ?? defaultDurations),
         mode ?? "year-round",
         enabled ?? true,
       ]
@@ -124,7 +126,7 @@ router.put(
       asr_school,
       prayers,
       pause_offset_minutes,
-      pause_duration_minutes,
+      pause_durations,
       mode,
       enabled,
     } = req.body;
@@ -133,7 +135,7 @@ router.put(
       `UPDATE zone_configs SET
         city = $1, country = $2, latitude = $3, longitude = $4,
         timezone = $5, method = $6, asr_school = $7, prayers = $8,
-        pause_offset_minutes = $9, pause_duration_minutes = $10,
+        pause_offset_minutes = $9, pause_durations = $10,
         mode = $11, enabled = $12, updated_at = NOW()
        WHERE id = $13 RETURNING *`,
       [
@@ -146,7 +148,7 @@ router.put(
         asr_school,
         prayers,
         pause_offset_minutes,
-        pause_duration_minutes,
+        JSON.stringify(pause_durations),
         mode,
         enabled,
         req.params.id,
@@ -205,6 +207,25 @@ router.post(
   wrap(async (_req, res) => {
     await refreshAllSchedules();
     res.json({ refreshed: true });
+  })
+);
+
+// ── Test Zone (immediate pause/resume cycle) ──────────────────────────────
+
+router.post(
+  "/zones/:id/test",
+  wrap(async (req, res) => {
+    const pauseSeconds = Math.min(Number(req.query.duration) || 10, 60);
+    const result = await query("SELECT * FROM zone_configs WHERE id = $1", [
+      req.params.id,
+    ]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: "Zone config not found" });
+      return;
+    }
+    const config = result.rows[0];
+    const testResult = await testZone(config.id, config.zone_id, pauseSeconds);
+    res.json(testResult);
   })
 );
 

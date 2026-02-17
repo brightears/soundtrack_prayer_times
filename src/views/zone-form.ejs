@@ -121,27 +121,39 @@
 
         <label>Prayers to Pause For</label>
         <% const allPrayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-           const enabledPrayers = zone ? zone.prayers.split(',').map(p => p.trim()) : allPrayers; %>
-        <div class="grid" style="grid-template-columns: repeat(5, 1fr);">
-          <% for (const prayer of allPrayers) { %>
-            <label>
-              <input type="checkbox" name="prayer_<%= prayer %>" value="1"
-                <%= enabledPrayers.includes(prayer) ? 'checked' : '' %>>
-              <%= prayer %>
-            </label>
-          <% } %>
-        </div>
+           const enabledPrayers = zone ? zone.prayers.split(',').map(p => p.trim()) : allPrayers;
+           const defaultDurations = { Fajr: 15, Dhuhr: 20, Asr: 15, Maghrib: 15, Isha: 20 };
+           const durations = zone && zone.pause_durations ? zone.pause_durations : defaultDurations; %>
+        <table role="grid" style="margin-bottom: 1rem;">
+          <thead>
+            <tr>
+              <th>Prayer</th>
+              <th>Enabled</th>
+              <th>Duration (min)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% for (const prayer of allPrayers) { %>
+              <tr>
+                <td><%= prayer %></td>
+                <td>
+                  <input type="checkbox" name="prayer_<%= prayer %>" value="1"
+                    <%= enabledPrayers.includes(prayer) ? 'checked' : '' %>>
+                </td>
+                <td>
+                  <input type="number" name="duration_<%= prayer %>" min="5" max="60"
+                    value="<%= durations[prayer] || defaultDurations[prayer] %>"
+                    style="width: 5rem; margin: 0;">
+                </td>
+              </tr>
+            <% } %>
+          </tbody>
+        </table>
 
-        <div class="grid">
-          <label>Pause Duration (minutes)
-            <input type="number" name="pause_duration_minutes" min="5" max="60"
-              value="<%= zone ? zone.pause_duration_minutes : 20 %>">
-          </label>
-          <label>Pause Before Prayer (minutes)
-            <input type="number" name="pause_offset_minutes" min="0" max="30"
-              value="<%= zone ? zone.pause_offset_minutes : 0 %>">
-          </label>
-        </div>
+        <label>Pause Before Prayer (minutes)
+          <input type="number" name="pause_offset_minutes" min="0" max="30"
+            value="<%= zone ? zone.pause_offset_minutes : 0 %>">
+        </label>
 
         <div class="grid">
           <label>Mode

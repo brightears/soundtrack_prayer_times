@@ -5,7 +5,7 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-    "build": "npx tsc",
+    "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/server.js"
   },

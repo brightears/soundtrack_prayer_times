@@ -64,9 +64,21 @@ router.get("/zones/:id/edit", async (req: Request, res: Response) => {
 
 // ── Create Zone (form POST) ───────────────────────────────────────────────
 
+const DEFAULT_DURATIONS: Record<string, number> = {
+  Fajr: 15, Dhuhr: 20, Asr: 15, Maghrib: 15, Isha: 20,
+};
+
 function collectPrayers(body: Record<string, string>): string {
   const prayers = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
   return prayers.filter((p) => body[`prayer_${p}`]).join(",");
+}
+
+function collectDurations(body: Record<string, string>): Record<string, number> {
+  const durations: Record<string, number> = {};
+  for (const prayer of ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]) {
+    durations[prayer] = Number(body[`duration_${prayer}`]) || DEFAULT_DURATIONS[prayer];
+  }
+  return durations;
 }
 
 router.post("/zones/create", async (req: Request, res: Response) => {
@@ -82,11 +94,12 @@ router.post("/zones/create", async (req: Request, res: Response) => {
       return;
     }
 
+    const durations = collectDurations(b);
     const result = await query(
       `INSERT INTO zone_configs
        (account_id, account_name, location_id, location_name, zone_id, zone_name,
         city, country, timezone, method, asr_school,
-        prayers, pause_offset_minutes, pause_duration_minutes, mode, enabled)
+        prayers, pause_offset_minutes, pause_durations, mode, enabled)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING *`,
       [
@@ -103,7 +116,7 @@ router.post("/zones/create", async (req: Request, res: Response) => {
         Number(b.asr_school),
         prayers,
         Number(b.pause_offset_minutes) || 0,
-        Number(b.pause_duration_minutes) || 20,
+        JSON.stringify(durations),
         b.mode || "year-round",
         b.enabled !== "false",
       ]
@@ -143,10 +156,11 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
       return;
     }
 
+    const durations = collectDurations(b);
     const result = await query(
       `UPDATE zone_configs SET
         city = $1, country = $2, timezone = $3, method = $4, asr_school = $5,
-        prayers = $6, pause_offset_minutes = $7, pause_duration_minutes = $8,
+        prayers = $6, pause_offset_minutes = $7, pause_durations = $8,
         mode = $9, enabled = $10, updated_at = NOW()
        WHERE id = $11 RETURNING *`,
       [
@@ -157,7 +171,7 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
         Number(b.asr_school),
         prayers,
         Number(b.pause_offset_minutes) || 0,
-        Number(b.pause_duration_minutes) || 20,
+        JSON.stringify(durations),
         b.mode || "year-round",
         b.enabled !== "false",
         req.params.id,

@@ -53,7 +53,7 @@
             <td><%= z.account_name %></td>
             <td><%= z.city %>, <%= z.country %></td>
             <td><%= z.prayers %></td>
-            <td><%= z.pause_duration_minutes %> min</td>
+            <td><% const d = z.pause_durations || {}; %><%= ['Fajr','Dhuhr','Asr','Maghrib','Isha'].map(p => p[0] + ':' + (d[p] || '?')).join(' ') %></td>
             <td><%= z.mode %></td>
             <td>
               <% if (!z.enabled) { %>

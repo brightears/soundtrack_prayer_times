@@ -15,7 +15,7 @@ interface ZoneConfig {
   asr_school: number;
   prayers: string;
   pause_offset_minutes: number;
-  pause_duration_minutes: number;
+  pause_durations: Record<string, number>;
   mode: string;
   enabled: boolean;
 }
@@ -206,8 +206,9 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
     const pauseTime = new Date(
       prayerTime.getTime() - config.pause_offset_minutes * 60_000
     );
+    const durationMinutes = config.pause_durations[prayer] ?? 20;
     const resumeTime = new Date(
-      prayerTime.getTime() + config.pause_duration_minutes * 60_000
+      prayerTime.getTime() + durationMinutes * 60_000
     );
 
     const nowMs = now.getTime();
@@ -346,6 +347,44 @@ export function stopScheduler(): void {
     clearTimeouts(configId);
   }
   console.log("Scheduler stopped.");
+}
+
+export async function testZone(
+  configId: number,
+  zoneId: string,
+  pauseSeconds: number = 10
+): Promise<{ paused: boolean; resumed: boolean; error?: string }> {
+  const result = { paused: false, resumed: false, error: undefined as string | undefined };
+
+  // Step 1: Pause
+  try {
+    console.log(`[TEST] Pausing zone ${zoneId} for ${pauseSeconds}s...`);
+    await executeWithRetry(PAUSE, zoneId);
+    await logAction(configId, zoneId, "test-pause", "test", new Date(), true);
+    result.paused = true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await logAction(configId, zoneId, "test-pause", "test", new Date(), false, msg);
+    result.error = `Pause failed: ${msg}`;
+    return result;
+  }
+
+  // Step 2: Wait
+  await new Promise((r) => setTimeout(r, pauseSeconds * 1000));
+
+  // Step 3: Resume
+  try {
+    console.log(`[TEST] Resuming zone ${zoneId}...`);
+    await executeWithRetry(PLAY, zoneId);
+    await logAction(configId, zoneId, "test-resume", "test", new Date(), true);
+    result.resumed = true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await logAction(configId, zoneId, "test-resume", "test", new Date(), false, msg);
+    result.error = `Resume failed: ${msg}`;
+  }
+
+  return result;
 }
 
 export function getSchedulerStatus(): {
