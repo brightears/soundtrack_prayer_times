@@ -66,13 +66,46 @@
                 <span style="color: gray;">Pending</span>
               <% } %>
             </td>
-            <td><a href="/zones/<%= z.id %>/edit">Edit</a></td>
+            <td>
+              <button class="outline secondary test-btn" data-id="<%= z.id %>" style="padding: 0.25rem 0.5rem; margin: 0 0.25rem 0 0; font-size: 0.85rem;">Test</button>
+              <a href="/zones/<%= z.id %>/edit">Edit</a>
+            </td>
           </tr>
           <% } %>
         </tbody>
       </table>
     </figure>
     <% } %>
-  </main>
+    </main>
+  <script>
+    document.querySelectorAll('.test-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        btn.disabled = true;
+        btn.textContent = 'Pausing...';
+        try {
+          const res = await fetch('/api/zones/' + id + '/test?duration=10', { method: 'POST' });
+          const data = await res.json();
+          if (data.error) {
+            btn.textContent = 'Failed';
+            btn.style.color = 'red';
+            alert('Test failed: ' + data.error);
+          } else {
+            btn.textContent = 'OK';
+            btn.style.color = 'green';
+          }
+        } catch (err) {
+          btn.textContent = 'Error';
+          btn.style.color = 'red';
+          alert('Test error: ' + err.message);
+        }
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = 'Test';
+          btn.style.color = '';
+        }, 3000);
+      });
+    });
+  </script>
 </body>
 </html>
