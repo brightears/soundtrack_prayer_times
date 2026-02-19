@@ -1,111 +1,167 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard - Prayer Times</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-  <link rel="stylesheet" href="/public/style.css">
-</head>
-<body>
-  <header class="container">
-    <nav>
-      <ul><li><strong>Prayer Times</strong></li></ul>
-      <ul>
-        <li><a href="/">Dashboard</a></li>
-        <li><a href="/zones/new">Add Zone</a></li>
-        <li><a href="/log">Activity Log</a></li>
-      </ul>
-    </nav>
-  </header>
-  <main class="container">
-    <hgroup>
-      <h1>Dashboard</h1>
-      <p>Scheduler: <%= schedulerStatus.activeZones %> zone(s) active, <%= schedulerStatus.activeTimeouts %> action(s) scheduled</p>
-    </hgroup>
+<%- include('_head') %>
 
-    <div style="margin-bottom: 1rem; text-align: right;">
-      <a href="/zones/new" role="button">Add Zone</a>
-      <button class="secondary outline" onclick="fetch('/api/refresh',{method:'POST'}).then(()=>location.reload())" style="margin-left: 0.5rem;">Refresh Schedules</button>
+<div class="page-header">
+  <div class="page-header__top">
+    <div>
+      <h1 class="page-header__title">Dashboard</h1>
+      <p class="page-header__subtitle"><%= schedulerStatus.activeZones %> zone(s) active, <%= schedulerStatus.activeTimeouts %> action(s) scheduled</p>
     </div>
+    <div class="page-header__actions">
+      <button class="btn btn--ghost" id="refresh-btn" type="button">Refresh Schedules</button>
+      <a href="/zones/new" class="btn btn--primary">Add Zone</a>
+    </div>
+  </div>
+</div>
 
-    <% if (zones.length === 0) { %>
-      <p>No zones configured yet. <a href="/zones/new">Add your first zone.</a></p>
-    <% } else { %>
-    <figure>
-      <table>
-        <thead>
-          <tr>
-            <th>Zone</th>
-            <th>Account</th>
-            <th>Location</th>
-            <th>Prayers</th>
-            <th>Duration</th>
-            <th>Mode</th>
-            <th>Status</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          <% for (const z of zones) { %>
-          <tr>
-            <td><%= z.zone_name %></td>
-            <td><%= z.account_name %></td>
-            <td><%= z.city %>, <%= z.country %></td>
-            <td><%= z.prayers %></td>
-            <td><% const d = z.pause_durations || {}; %><%= ['Fajr','Dhuhr','Asr','Maghrib','Isha'].map(p => p[0] + ':' + (d[p] || '?')).join(' ') %></td>
-            <td><%= z.mode %></td>
-            <td>
-              <% if (!z.enabled) { %>
-                <span style="color: orange;">Disabled</span>
-              <% } else if (z.last_action && z.last_action.success) { %>
-                <span style="color: green;">OK</span>
-              <% } else if (z.last_action && !z.last_action.success) { %>
-                <span style="color: red;">Failed</span>
-              <% } else { %>
-                <span style="color: gray;">Pending</span>
+<!-- Stats Row -->
+<div class="grid-3" style="margin-bottom: var(--space-8);">
+  <div class="card card--sm">
+    <div class="card__header">
+      <span class="card__title">Active Zones</span>
+      <div class="card__icon">&#9776;</div>
+    </div>
+    <div class="card__value"><%= schedulerStatus.activeZones %></div>
+    <div class="card__subtitle">Zones with scheduling enabled</div>
+  </div>
+  <div class="card card--sm">
+    <div class="card__header">
+      <span class="card__title">Scheduled</span>
+      <div class="card__icon">&#9200;</div>
+    </div>
+    <div class="card__value"><%= schedulerStatus.activeTimeouts %></div>
+    <div class="card__subtitle">Pending pause/resume actions</div>
+  </div>
+  <div class="card card--sm">
+    <div class="card__header">
+      <span class="card__title">Total Zones</span>
+      <div class="card__icon">&#9881;</div>
+    </div>
+    <div class="card__value"><%= zones.length %></div>
+    <div class="card__subtitle">Configured zone entries</div>
+  </div>
+</div>
+
+<% if (zones.length === 0) { %>
+  <div class="card">
+    <div class="empty-state">
+      <div class="empty-state__icon">&#128267;</div>
+      <div class="empty-state__title">No zones configured</div>
+      <div class="empty-state__body">Add your first sound zone to start scheduling prayer time pauses.</div>
+      <a href="/zones/new" class="btn btn--primary">Add Zone</a>
+    </div>
+  </div>
+<% } else { %>
+  <div class="data-table--wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Zone</th>
+          <th>Account</th>
+          <th>Location</th>
+          <th>Prayers</th>
+          <th>Duration</th>
+          <th>Mode</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const z of zones) { %>
+        <tr>
+          <td class="text-bold"><%= z.zone_name %></td>
+          <td><%= z.account_name %></td>
+          <td><%= z.city %>, <%= z.country %></td>
+          <td>
+            <div class="prayer-pills">
+              <% const prayers = z.prayers.split(',').map(p => p.trim()); %>
+              <% for (const p of prayers) { %>
+                <span class="prayer-pill"><%= p %></span>
               <% } %>
-            </td>
-            <td>
-              <button class="outline secondary test-btn" data-id="<%= z.id %>" style="padding: 0.25rem 0.5rem; margin: 0 0.25rem 0 0; font-size: 0.85rem;">Test</button>
-              <a href="/zones/<%= z.id %>/edit">Edit</a>
-            </td>
-          </tr>
-          <% } %>
-        </tbody>
-      </table>
-    </figure>
-    <% } %>
-    </main>
-  <script>
-    document.querySelectorAll('.test-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.id;
-        btn.disabled = true;
-        btn.textContent = 'Pausing...';
-        try {
-          const res = await fetch('/api/zones/' + id + '/test?duration=10', { method: 'POST' });
-          const data = await res.json();
-          if (data.error) {
-            btn.textContent = 'Failed';
-            btn.style.color = 'red';
-            alert('Test failed: ' + data.error);
-          } else {
-            btn.textContent = 'OK';
-            btn.style.color = 'green';
-          }
-        } catch (err) {
-          btn.textContent = 'Error';
-          btn.style.color = 'red';
-          alert('Test error: ' + err.message);
+            </div>
+          </td>
+          <td>
+            <div class="prayer-pills">
+              <% const d = z.pause_durations || {}; %>
+              <% for (const p of ['Fajr','Dhuhr','Asr','Maghrib','Isha']) { %>
+                <% if (d[p]) { %>
+                  <span class="prayer-pill"><%= p[0] %>:<%= d[p] %>m</span>
+                <% } %>
+              <% } %>
+            </div>
+          </td>
+          <td><%= z.mode %></td>
+          <td>
+            <% if (!z.enabled) { %>
+              <span class="badge badge--warning">Disabled</span>
+            <% } else if (z.last_action && z.last_action.success) { %>
+              <span class="badge badge--success">OK</span>
+            <% } else if (z.last_action && !z.last_action.success) { %>
+              <span class="badge badge--error">Failed</span>
+            <% } else { %>
+              <span class="badge badge--pending">Pending</span>
+            <% } %>
+          </td>
+          <td>
+            <div style="display: flex; gap: var(--space-2); align-items: center;">
+              <button class="btn btn--ghost btn--sm test-btn" data-id="<%= z.id %>" type="button">Test</button>
+              <a href="/zones/<%= z.id %>/edit" class="btn btn--secondary btn--sm">Edit</a>
+            </div>
+          </td>
+        </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<script>
+  // Refresh button
+  document.getElementById('refresh-btn').addEventListener('click', async function() {
+    this.classList.add('btn--loading');
+    this.disabled = true;
+    try {
+      await fetch('/api/refresh', { method: 'POST' });
+      location.reload();
+    } catch (err) {
+      this.classList.remove('btn--loading');
+      this.disabled = false;
+    }
+  });
+
+  // Test buttons
+  document.querySelectorAll('.test-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      btn.classList.add('btn--loading');
+      btn.disabled = true;
+      btn.textContent = 'Pausing...';
+      try {
+        const res = await fetch('/api/zones/' + id + '/test?duration=10', { method: 'POST' });
+        const data = await res.json();
+        btn.classList.remove('btn--loading');
+        if (data.error) {
+          btn.textContent = 'Failed';
+          btn.style.borderColor = 'var(--color-error)';
+          btn.style.color = 'var(--color-error)';
+        } else {
+          btn.textContent = 'OK';
+          btn.style.borderColor = 'var(--color-success)';
+          btn.style.color = 'var(--color-success)';
         }
-        setTimeout(() => {
-          btn.disabled = false;
-          btn.textContent = 'Test';
-          btn.style.color = '';
-        }, 3000);
-      });
+      } catch (err) {
+        btn.classList.remove('btn--loading');
+        btn.textContent = 'Error';
+        btn.style.borderColor = 'var(--color-error)';
+        btn.style.color = 'var(--color-error)';
+      }
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = 'Test';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }, 3000);
     });
-  </script>
-</body>
-</html>
+  });
+</script>
+
+<%- include('_foot') %>

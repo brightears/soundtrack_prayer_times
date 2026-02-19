@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof pageTitle !== 'undefined' && pageTitle ? pageTitle + ' - ' : '' %>Soundtrack Prayer Times</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <link rel="stylesheet" href="/public/style.css">
+</head>
+<body>
+  <nav class="site-nav">
+    <div class="site-nav__inner">
+      <a href="/" class="site-nav__brand">
+        <span class="site-nav__brand-text">BMAsia</span>
+        <span class="site-nav__brand-divider"></span>
+        <span class="site-nav__subtitle">Prayer Times</span>
+      </a>
+      <ul class="site-nav__links">
+        <li><a href="/"<%= typeof currentPage !== 'undefined' && currentPage === 'dashboard' ? ' class="is-active"' : '' %>>Dashboard</a></li>
+        <li><a href="/zones/new"<%= typeof currentPage !== 'undefined' && currentPage === 'zones-new' ? ' class="is-active"' : '' %>>Add Zone</a></li>
+        <li><a href="/log"<%= typeof currentPage !== 'undefined' && currentPage === 'log' ? ' class="is-active"' : '' %>>Activity Log</a></li>
+      </ul>
+    </div>
+  </nav>
+  <main class="page-content">
+    <div class="container">

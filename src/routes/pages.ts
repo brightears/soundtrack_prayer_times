@@ -23,6 +23,7 @@ router.get("/", async (_req: Request, res: Response) => {
     res.render("dashboard", {
       zones: zones.rows,
       schedulerStatus: status,
+      currentPage: "dashboard",
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -37,6 +38,7 @@ router.get("/zones/new", (_req: Request, res: Response) => {
     zone: null,
     methods: CALCULATION_METHODS,
     error: null,
+    currentPage: "zones-new",
   });
 });
 
@@ -55,6 +57,7 @@ router.get("/zones/:id/edit", async (req: Request, res: Response) => {
       zone: result.rows[0],
       methods: CALCULATION_METHODS,
       error: null,
+      currentPage: "zones-new",
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -90,6 +93,7 @@ router.post("/zones/create", async (req: Request, res: Response) => {
         zone: null,
         methods: CALCULATION_METHODS,
         error: "Select at least one prayer.",
+        currentPage: "zones-new",
       });
       return;
     }
@@ -134,6 +138,7 @@ router.post("/zones/create", async (req: Request, res: Response) => {
       zone: null,
       methods: CALCULATION_METHODS,
       error: msg,
+      currentPage: "zones-new",
     });
   }
 });
@@ -152,6 +157,7 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
         zone: existing.rows[0] ?? null,
         methods: CALCULATION_METHODS,
         error: "Select at least one prayer.",
+        currentPage: "zones-new",
       });
       return;
     }
@@ -194,6 +200,7 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
       zone: existing.rows[0] ?? null,
       methods: CALCULATION_METHODS,
       error: msg,
+      currentPage: "zones-new",
     });
   }
 });
@@ -209,7 +216,7 @@ router.get("/log", async (_req: Request, res: Response) => {
        ORDER BY al.created_at DESC
        LIMIT 100`
     );
-    res.render("log", { logs: result.rows });
+    res.render("log", { logs: result.rows, currentPage: "log" });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).send(`Error: ${msg}`);

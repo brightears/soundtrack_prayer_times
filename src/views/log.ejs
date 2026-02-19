@@ -1,64 +1,69 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Activity Log - Prayer Times</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-  <link rel="stylesheet" href="/public/style.css">
-</head>
-<body>
-  <header class="container">
-    <nav>
-      <ul><li><strong>Prayer Times</strong></li></ul>
-      <ul>
-        <li><a href="/">Dashboard</a></li>
-        <li><a href="/zones/new">Add Zone</a></li>
-        <li><a href="/log">Activity Log</a></li>
-      </ul>
-    </nav>
-  </header>
-  <main class="container">
-    <h1>Activity Log</h1>
+<%- include('_head') %>
 
-    <% if (logs.length === 0) { %>
-      <p>No activity yet. Actions will appear here once the scheduler runs.</p>
-    <% } else { %>
-    <figure>
-      <table>
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Zone</th>
-            <th>Account</th>
-            <th>Action</th>
-            <th>Prayer</th>
-            <th>Result</th>
-            <th>Error</th>
-          </tr>
-        </thead>
-        <tbody>
-          <% for (const log of logs) { %>
-          <tr>
-            <td><%= new Date(log.executed_at).toLocaleString() %></td>
-            <td><%= log.zone_name %></td>
-            <td><%= log.account_name %></td>
-            <td><%= log.action %></td>
-            <td><%= log.prayer %></td>
-            <td>
-              <% if (log.success) { %>
-                <span style="color: green;">OK</span>
-              <% } else { %>
-                <span style="color: red;">Failed</span>
-              <% } %>
-            </td>
-            <td><%= log.error_message || '' %></td>
-          </tr>
-          <% } %>
-        </tbody>
-      </table>
-    </figure>
-    <% } %>
-  </main>
-</body>
-</html>
+<div class="page-header">
+  <div class="page-header__top">
+    <div>
+      <h1 class="page-header__title">Activity Log</h1>
+      <p class="page-header__subtitle">Recent pause and resume actions across all zones</p>
+    </div>
+    <div class="page-header__actions">
+      <a href="/" class="btn btn--ghost">Back to Dashboard</a>
+    </div>
+  </div>
+</div>
+
+<% if (logs.length === 0) { %>
+  <div class="card">
+    <div class="empty-state">
+      <div class="empty-state__icon">&#128196;</div>
+      <div class="empty-state__title">No activity yet</div>
+      <div class="empty-state__body">Actions will appear here once the scheduler runs. Configure a zone and wait for the next prayer time.</div>
+      <a href="/" class="btn btn--primary">Go to Dashboard</a>
+    </div>
+  </div>
+<% } else { %>
+  <div class="data-table--wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Zone</th>
+          <th>Account</th>
+          <th>Action</th>
+          <th>Prayer</th>
+          <th>Result</th>
+          <th>Error</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const log of logs) { %>
+        <tr>
+          <td style="white-space: nowrap;"><%= new Date(log.executed_at).toLocaleString() %></td>
+          <td class="text-bold"><%= log.zone_name %></td>
+          <td><%= log.account_name %></td>
+          <td>
+            <span class="prayer-pill"><%= log.action %></span>
+          </td>
+          <td><%= log.prayer %></td>
+          <td>
+            <% if (log.success) { %>
+              <span class="badge badge--success">OK</span>
+            <% } else { %>
+              <span class="badge badge--error">Failed</span>
+            <% } %>
+          </td>
+          <td>
+            <% if (log.error_message) { %>
+              <span class="text-muted" title="<%= log.error_message %>" style="font-size: var(--font-size-xs); max-width: 200px; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <%= log.error_message %>
+              </span>
+            <% } %>
+          </td>
+        </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<%- include('_foot') %>
