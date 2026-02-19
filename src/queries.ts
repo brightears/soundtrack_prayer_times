@@ -64,13 +64,13 @@ query LocationSoundZones($accountId: ID!) {
 export const PLAY = `
 mutation Play($soundZone: ID!) {
   play(input: { soundZone: $soundZone }) {
-    playing
+    __typename
   }
 }`;
 
 export const PAUSE = `
 mutation Pause($soundZone: ID!) {
   pause(input: { soundZone: $soundZone }) {
-    playing
+    __typename
   }
 }`;
