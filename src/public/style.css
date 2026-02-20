@@ -161,19 +161,6 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
   letter-spacing: -0.01em;
 }
 
-.site-nav__brand-divider {
-  width: 1px;
-  height: 20px;
-  background: var(--glass-border);
-}
-
-.site-nav__subtitle {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-  font-weight: 500;
-  white-space: nowrap;
-}
-
 .site-nav__links {
   display: flex;
   align-items: center;
@@ -215,8 +202,6 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 }
 
 @media (max-width: 640px) {
-  .site-nav__subtitle { display: none; }
-  .site-nav__brand-divider { display: none; }
   .site-nav__links a { padding: var(--space-2); font-size: var(--font-size-xs); }
 }
 
