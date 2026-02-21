@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { randomBytes } from "crypto";
 import { query } from "../db.js";
 import { graphql, extractNodes } from "../soundtrack.js";
 import {
@@ -330,6 +331,49 @@ router.get(
       }));
     });
     res.json(zones);
+  })
+);
+
+// ── Customer Management API ──────────────────────────────────────────────
+
+router.get(
+  "/customers",
+  wrap(async (_req, res) => {
+    const result = await query(
+      "SELECT * FROM customers ORDER BY created_at DESC"
+    );
+    res.json(result.rows);
+  })
+);
+
+router.post(
+  "/customers/:id/regenerate-token",
+  wrap(async (req, res) => {
+    const token = randomBytes(32).toString("hex");
+    const result = await query(
+      "UPDATE customers SET token = $1, updated_at = NOW() WHERE id = $2 RETURNING *",
+      [token, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: "Customer not found" });
+      return;
+    }
+    res.json(result.rows[0]);
+  })
+);
+
+router.delete(
+  "/customers/:id",
+  wrap(async (req, res) => {
+    const result = await query(
+      "DELETE FROM customers WHERE id = $1 RETURNING id",
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: "Customer not found" });
+      return;
+    }
+    res.json({ deleted: true });
   })
 );
 

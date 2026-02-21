@@ -6,6 +6,8 @@ import { runMigrations } from "./db.js";
 import { startScheduler, stopScheduler, getSchedulerStatus } from "./scheduler.js";
 import apiRouter from "./routes/api.js";
 import pageRouter from "./routes/pages.js";
+import portalPageRouter from "./routes/portal-pages.js";
+import portalApiRouter from "./routes/portal-api.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 3000;
@@ -25,7 +27,11 @@ app.use("/public", express.static(join(srcDir, "public")));
 app.set("view engine", "ejs");
 app.set("views", join(srcDir, "views"));
 
-// Admin auth middleware (HTTP Basic Auth)
+// Customer portal routes (token-based auth, no Basic Auth)
+app.use("/p", portalPageRouter);
+app.use("/p", portalApiRouter);
+
+// Admin auth middleware (HTTP Basic Auth — applies to everything below)
 if (ADMIN_PASSWORD) {
   app.use((req, res, next) => {
     // Skip auth for health endpoint

@@ -1,0 +1,128 @@
+<%- include('_head') %>
+
+<div class="page-header">
+  <div class="page-header__top">
+    <div>
+      <h1 class="page-header__title"><%= customer ? 'Edit' : 'Add' %> Customer</h1>
+      <p class="page-header__subtitle"><%= customer ? 'Manage portal access for ' + customer.name : 'Create a customer portal link' %></p>
+    </div>
+    <div class="page-header__actions">
+      <a href="/customers" class="btn btn--ghost">Back to Customers</a>
+    </div>
+  </div>
+</div>
+
+<% if (error) { %>
+  <div class="alert alert--error"><%= error %></div>
+<% } %>
+
+<% if (portalUrl) { %>
+  <div class="alert alert--success" style="display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap;">
+    <div>
+      <strong>Portal link:</strong>
+      <code style="word-break: break-all;"><%= portalUrl %></code>
+    </div>
+    <button class="btn btn--primary btn--sm" type="button" id="copy-portal-url" data-url="<%= portalUrl %>">Copy Link</button>
+  </div>
+<% } %>
+
+<form method="POST" action="<%= customer ? '/customers/' + customer.id + '/update' : '/customers/create' %>" style="max-width: 720px;">
+
+  <div class="form-section">
+    <div class="form-section__title">Customer Details</div>
+
+    <div class="field">
+      <label class="field__label field__label--required">Customer Name</label>
+      <input type="text" name="name" class="field__input" value="<%= customer ? customer.name : '' %>" required placeholder="e.g. Acme Restaurant">
+    </div>
+
+    <% if (!customer) { %>
+    <div class="field">
+      <label class="field__label field__label--required">Soundtrack Account</label>
+      <select name="account_id" id="account-select" class="field__select" required>
+        <option value="">Loading accounts...</option>
+      </select>
+      <input type="hidden" name="account_name" id="account-name">
+    </div>
+    <% } else { %>
+    <div class="field">
+      <label class="field__label">Soundtrack Account</label>
+      <p style="margin: 0;"><span class="text-bold"><%= customer.account_name %></span> <span class="text-muted">(<%= customer.account_id %>)</span></p>
+    </div>
+    <% } %>
+
+    <div class="field">
+      <label class="field__label">Enabled</label>
+      <select name="enabled" class="field__select">
+        <option value="true" <%= !customer || customer.enabled ? 'selected' : '' %>>Yes</option>
+        <option value="false" <%= customer && !customer.enabled ? 'selected' : '' %>>No</option>
+      </select>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap;">
+    <button type="submit" class="btn btn--primary btn--lg"><%= customer ? 'Save Changes' : 'Create Customer' %></button>
+    <% if (customer) { %>
+      <button type="button" class="btn btn--ghost" id="regenerate-btn">Regenerate Link</button>
+      <button type="button" class="btn btn--danger" id="delete-btn">Delete</button>
+    <% } %>
+    <a href="/customers" class="btn btn--ghost">Cancel</a>
+  </div>
+</form>
+
+<script>
+  // Load Soundtrack accounts for the dropdown (only on create form)
+  const accountSelect = document.getElementById('account-select');
+  if (accountSelect) {
+    fetch('/api/soundtrack/accounts')
+      .then(r => r.json())
+      .then(accounts => {
+        accountSelect.innerHTML = '<option value="">Select account...</option>' +
+          accounts.map(a => '<option value="' + a.id + '">' + a.name + '</option>').join('');
+      });
+
+    accountSelect.addEventListener('change', () => {
+      const opt = accountSelect.options[accountSelect.selectedIndex];
+      document.getElementById('account-name').value = opt.text;
+    });
+  }
+
+  // Copy portal URL
+  const copyBtn = document.getElementById('copy-portal-url');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(copyBtn.dataset.url).then(() => {
+        copyBtn.textContent = 'Copied!';
+        setTimeout(() => { copyBtn.textContent = 'Copy Link'; }, 2000);
+      });
+    });
+  }
+
+  // Regenerate token
+  const regenBtn = document.getElementById('regenerate-btn');
+  if (regenBtn) {
+    regenBtn.addEventListener('click', () => {
+      if (confirm('Regenerate the portal link? The old link will stop working immediately.')) {
+        regenBtn.classList.add('btn--loading');
+        regenBtn.disabled = true;
+        fetch('/api/customers/<%= customer ? customer.id : '' %>/regenerate-token', { method: 'POST' })
+          .then(() => location.reload());
+      }
+    });
+  }
+
+  // Delete customer
+  const deleteBtn = document.getElementById('delete-btn');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', () => {
+      if (confirm('Delete this customer? Their portal link will stop working.')) {
+        deleteBtn.classList.add('btn--loading');
+        deleteBtn.disabled = true;
+        fetch('/api/customers/<%= customer ? customer.id : '' %>', { method: 'DELETE' })
+          .then(() => location.href = '/customers');
+      }
+    });
+  }
+</script>
+
+<%- include('_foot') %>

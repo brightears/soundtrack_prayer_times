@@ -13,14 +13,14 @@
 <body>
   <nav class="site-nav">
     <div class="site-nav__inner">
-      <a href="/" class="site-nav__brand">
+      <a href="<%= basePath %>" class="site-nav__brand">
         <img src="/public/BMAsia_Logo.png" alt="BMAsia" class="site-nav__logo">
       </a>
       <ul class="site-nav__links">
-        <li><a href="/"<%= typeof currentPage !== 'undefined' && currentPage === 'dashboard' ? ' class="is-active"' : '' %>>Dashboard</a></li>
-        <li><a href="/zones/new"<%= typeof currentPage !== 'undefined' && currentPage === 'zones-new' ? ' class="is-active"' : '' %>>Add Zone</a></li>
-        <li><a href="/log"<%= typeof currentPage !== 'undefined' && currentPage === 'log' ? ' class="is-active"' : '' %>>Activity Log</a></li>
-        <li><a href="/customers"<%= typeof currentPage !== 'undefined' && currentPage === 'customers' ? ' class="is-active"' : '' %>>Customers</a></li>
+        <li><a href="<%= basePath %>"<%= typeof currentPage !== 'undefined' && currentPage === 'dashboard' ? ' class="is-active"' : '' %>>Dashboard</a></li>
+        <li><a href="<%= basePath %>/zones/new"<%= typeof currentPage !== 'undefined' && currentPage === 'zones-new' ? ' class="is-active"' : '' %>>Add Zone</a></li>
+        <li><a href="<%= basePath %>/log"<%= typeof currentPage !== 'undefined' && currentPage === 'log' ? ' class="is-active"' : '' %>>Activity Log</a></li>
+        <li><span class="text-muted" style="font-size: var(--font-size-xs); padding: var(--space-2);"><%= customer.name %></span></li>
       </ul>
     </div>
   </nav>

@@ -1,0 +1,80 @@
+<%- include('_head') %>
+
+<div class="page-header">
+  <div class="page-header__top">
+    <div>
+      <h1 class="page-header__title">Customers</h1>
+      <p class="page-header__subtitle">Manage customer portal access</p>
+    </div>
+    <div class="page-header__actions">
+      <a href="/customers/new" class="btn btn--primary">Add Customer</a>
+    </div>
+  </div>
+</div>
+
+<% if (customers.length === 0) { %>
+  <div class="card">
+    <div class="empty-state">
+      <div class="empty-state__icon">&#128101;</div>
+      <div class="empty-state__title">No customers yet</div>
+      <div class="empty-state__body">Create a customer to generate a self-service portal link.</div>
+      <a href="/customers/new" class="btn btn--primary">Add Customer</a>
+    </div>
+  </div>
+<% } else { %>
+  <div class="data-table--wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Customer</th>
+          <th>Account</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const c of customers) { %>
+        <tr>
+          <td class="text-bold"><%= c.name %></td>
+          <td><%= c.account_name %></td>
+          <td>
+            <% if (c.enabled) { %>
+              <span class="badge badge--success">Active</span>
+            <% } else { %>
+              <span class="badge badge--pending">Disabled</span>
+            <% } %>
+          </td>
+          <td><%= new Date(c.created_at).toLocaleDateString() %></td>
+          <td>
+            <div style="display: flex; gap: var(--space-2); align-items: center;">
+              <button class="btn btn--ghost btn--sm copy-link-btn" data-token="<%= c.token %>" type="button">Copy Link</button>
+              <a href="/customers/<%= c.id %>/edit" class="btn btn--secondary btn--sm">Edit</a>
+            </div>
+          </td>
+        </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<script>
+  document.querySelectorAll('.copy-link-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const url = location.origin + '/p/' + btn.dataset.token;
+      navigator.clipboard.writeText(url).then(() => {
+        btn.textContent = 'Copied!';
+        btn.style.borderColor = 'var(--color-success)';
+        btn.style.color = 'var(--color-success)';
+        setTimeout(() => {
+          btn.textContent = 'Copy Link';
+          btn.style.borderColor = '';
+          btn.style.color = '';
+        }, 2000);
+      });
+    });
+  });
+</script>
+
+<%- include('_foot') %>

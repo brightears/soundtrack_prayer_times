@@ -1,0 +1,122 @@
+<%- include('_head') %>
+
+<div class="page-header">
+  <div class="page-header__top">
+    <div>
+      <h1 class="page-header__title">Dashboard</h1>
+      <p class="page-header__subtitle"><%= customer.account_name %> &mdash; <%= zones.length %> zone(s) configured</p>
+    </div>
+    <div class="page-header__actions">
+      <a href="<%= basePath %>/zones/new" class="btn btn--primary">Add Zone</a>
+    </div>
+  </div>
+</div>
+
+<% if (zones.length === 0) { %>
+  <div class="card">
+    <div class="empty-state">
+      <div class="empty-state__icon">&#128267;</div>
+      <div class="empty-state__title">No zones configured</div>
+      <div class="empty-state__body">Add your first sound zone to start scheduling prayer time pauses.</div>
+      <a href="<%= basePath %>/zones/new" class="btn btn--primary">Add Zone</a>
+    </div>
+  </div>
+<% } else { %>
+  <div class="data-table--wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Zone</th>
+          <th>Location</th>
+          <th>Prayers</th>
+          <th>Duration</th>
+          <th>Mode</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% for (const z of zones) { %>
+        <tr>
+          <td class="text-bold"><%= z.zone_name %></td>
+          <td><%= z.city %>, <%= z.country %></td>
+          <td>
+            <div class="prayer-pills">
+              <% const prayers = z.prayers.split(',').map(p => p.trim()); %>
+              <% for (const p of prayers) { %>
+                <span class="prayer-pill"><%= p %></span>
+              <% } %>
+            </div>
+          </td>
+          <td>
+            <div class="prayer-pills">
+              <% const d = z.pause_durations || {}; %>
+              <% for (const p of ['Fajr','Dhuhr','Asr','Maghrib','Isha']) { %>
+                <% if (d[p]) { %>
+                  <span class="prayer-pill"><%= p[0] %>:<%= d[p] %>m</span>
+                <% } %>
+              <% } %>
+            </div>
+          </td>
+          <td><%= z.mode %></td>
+          <td>
+            <% if (!z.enabled) { %>
+              <span class="badge badge--warning">Disabled</span>
+            <% } else if (z.last_action && z.last_action.success) { %>
+              <span class="badge badge--success">OK</span>
+            <% } else if (z.last_action && !z.last_action.success) { %>
+              <span class="badge badge--error">Failed</span>
+            <% } else { %>
+              <span class="badge badge--pending">Pending</span>
+            <% } %>
+          </td>
+          <td>
+            <div style="display: flex; gap: var(--space-2); align-items: center;">
+              <button class="btn btn--ghost btn--sm test-btn" data-id="<%= z.id %>" type="button">Test</button>
+              <a href="<%= basePath %>/zones/<%= z.id %>/edit" class="btn btn--secondary btn--sm">Edit</a>
+            </div>
+          </td>
+        </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+<% } %>
+
+<script>
+  document.querySelectorAll('.test-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      btn.classList.add('btn--loading');
+      btn.disabled = true;
+      btn.textContent = 'Pausing...';
+      try {
+        const res = await fetch('<%= basePath %>/api/zones/' + id + '/test?duration=10', { method: 'POST' });
+        const data = await res.json();
+        btn.classList.remove('btn--loading');
+        if (data.error) {
+          btn.textContent = 'Failed';
+          btn.style.borderColor = 'var(--color-error)';
+          btn.style.color = 'var(--color-error)';
+        } else {
+          btn.textContent = 'OK';
+          btn.style.borderColor = 'var(--color-success)';
+          btn.style.color = 'var(--color-success)';
+        }
+      } catch (err) {
+        btn.classList.remove('btn--loading');
+        btn.textContent = 'Error';
+        btn.style.borderColor = 'var(--color-error)';
+        btn.style.color = 'var(--color-error)';
+      }
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = 'Test';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }, 3000);
+    });
+  });
+</script>
+
+<%- include('../_foot') %>

@@ -1,7 +1,9 @@
 import { Router, type Request, type Response } from "express";
+import { randomBytes } from "crypto";
 import { query } from "../db.js";
 import { CALCULATION_METHODS } from "../aladhan.js";
 import { getSchedulerStatus, refreshZone } from "../scheduler.js";
+import { collectPrayers, collectDurations } from "../shared.js";
 
 const router = Router();
 
@@ -66,23 +68,6 @@ router.get("/zones/:id/edit", async (req: Request, res: Response) => {
 });
 
 // ── Create Zone (form POST) ───────────────────────────────────────────────
-
-const DEFAULT_DURATIONS: Record<string, number> = {
-  Fajr: 15, Dhuhr: 20, Asr: 15, Maghrib: 15, Isha: 20,
-};
-
-function collectPrayers(body: Record<string, string>): string {
-  const prayers = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
-  return prayers.filter((p) => body[`prayer_${p}`]).join(",");
-}
-
-function collectDurations(body: Record<string, string>): Record<string, number> {
-  const durations: Record<string, number> = {};
-  for (const prayer of ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]) {
-    durations[prayer] = Number(body[`duration_${prayer}`]) || DEFAULT_DURATIONS[prayer];
-  }
-  return durations;
-}
 
 router.post("/zones/create", async (req: Request, res: Response) => {
   try {
@@ -220,6 +205,127 @@ router.get("/log", async (_req: Request, res: Response) => {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).send(`Error: ${msg}`);
+  }
+});
+
+// ── Customer Management ──────────────────────────────────────────────────
+
+router.get("/customers", async (_req: Request, res: Response) => {
+  try {
+    const result = await query(
+      "SELECT * FROM customers ORDER BY created_at DESC"
+    );
+    res.render("customers", { customers: result.rows, currentPage: "customers" });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).send(`Error: ${msg}`);
+  }
+});
+
+router.get("/customers/new", (_req: Request, res: Response) => {
+  res.render("customer-form", {
+    customer: null,
+    error: null,
+    portalUrl: null,
+    currentPage: "customers",
+  });
+});
+
+router.get("/customers/:id/edit", async (req: Request, res: Response) => {
+  try {
+    const result = await query("SELECT * FROM customers WHERE id = $1", [
+      req.params.id,
+    ]);
+    if (result.rows.length === 0) {
+      res.status(404).send("Customer not found");
+      return;
+    }
+    const customer = result.rows[0];
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    res.render("customer-form", {
+      customer,
+      error: null,
+      portalUrl: `${baseUrl}/p/${customer.token}`,
+      currentPage: "customers",
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).send(`Error: ${msg}`);
+  }
+});
+
+router.post("/customers/create", async (req: Request, res: Response) => {
+  try {
+    const { name, account_id, account_name, enabled } = req.body;
+    if (!name || !account_id) {
+      res.render("customer-form", {
+        customer: null,
+        error: "Customer name and account are required.",
+        portalUrl: null,
+        currentPage: "customers",
+      });
+      return;
+    }
+
+    const token = randomBytes(32).toString("hex");
+    const result = await query(
+      `INSERT INTO customers (token, name, account_id, account_name, enabled)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [token, name, account_id, account_name || "", enabled !== "false"]
+    );
+
+    const customer = result.rows[0];
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    res.render("customer-form", {
+      customer,
+      error: null,
+      portalUrl: `${baseUrl}/p/${customer.token}`,
+      currentPage: "customers",
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.render("customer-form", {
+      customer: null,
+      error: msg,
+      portalUrl: null,
+      currentPage: "customers",
+    });
+  }
+});
+
+router.post("/customers/:id/update", async (req: Request, res: Response) => {
+  try {
+    const { name, enabled } = req.body;
+    const result = await query(
+      `UPDATE customers SET name = $1, enabled = $2, updated_at = NOW()
+       WHERE id = $3 RETURNING *`,
+      [name, enabled !== "false", req.params.id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).send("Customer not found");
+      return;
+    }
+    const customer = result.rows[0];
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    res.render("customer-form", {
+      customer,
+      error: null,
+      portalUrl: `${baseUrl}/p/${customer.token}`,
+      currentPage: "customers",
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const existing = await query("SELECT * FROM customers WHERE id = $1", [
+      req.params.id,
+    ]);
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const customer = existing.rows[0] ?? null;
+    res.render("customer-form", {
+      customer,
+      error: msg,
+      portalUrl: customer ? `${baseUrl}/p/${customer.token}` : null,
+      currentPage: "customers",
+    });
   }
 });
 
