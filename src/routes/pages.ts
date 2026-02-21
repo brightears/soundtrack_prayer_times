@@ -305,14 +305,7 @@ router.post("/customers/:id/update", async (req: Request, res: Response) => {
       res.status(404).send("Customer not found");
       return;
     }
-    const customer = result.rows[0];
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
-    res.render("customer-form", {
-      customer,
-      error: null,
-      portalUrl: `${baseUrl}/p/${customer.token}`,
-      currentPage: "customers",
-    });
+    res.redirect("/customers");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const existing = await query("SELECT * FROM customers WHERE id = $1", [
