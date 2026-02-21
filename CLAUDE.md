@@ -17,15 +17,29 @@ Standalone scheduler that automatically pauses and resumes Soundtrack music zone
 - `src/aladhan.ts` - Aladhan prayer times API client
 - `src/soundtrack.ts` - Soundtrack GraphQL client (adapted from soundtrack-mcp)
 - `src/queries.ts` - GraphQL queries + PLAY/PAUSE mutations
-- `src/routes/api.ts` - JSON API (CRUD zones, Soundtrack proxy, logs)
-- `src/routes/pages.ts` - Server-rendered pages (dashboard, forms, log)
-- `src/views/` - EJS templates
+- `src/shared.ts` - Shared helpers (collectPrayers, collectDurations, DEFAULT_DURATIONS)
+- `src/routes/api.ts` - JSON API (CRUD zones, Soundtrack proxy, logs, customer management)
+- `src/routes/pages.ts` - Server-rendered pages (dashboard, forms, log, customer management)
+- `src/routes/portal-pages.ts` - Customer portal pages (scoped dashboard, forms, log)
+- `src/routes/portal-api.ts` - Customer portal API (test, delete, refresh, Soundtrack proxy)
+- `src/middleware/portal-auth.ts` - Token validation middleware for customer portal
+- `src/views/` - Admin EJS templates
+- `src/views/portal/` - Customer portal EJS templates
 - `src/migrations/` - SQL migration files
 
 ## Database Tables
 - `zone_configs` - Zone prayer time configurations
 - `prayer_times_cache` - Cached daily prayer times (from Aladhan)
 - `action_log` - Every pause/resume action with success/failure
+- `customers` - Customer portal access (token, account_id, enabled)
+
+## Customer Portal
+- Secret link auth: `/p/:token` (256-bit random token, no login needed)
+- Admin creates customer at `/customers/new`, copies portal link, sends to customer
+- Portal routes mounted BEFORE Basic Auth in server.ts (bypass admin auth)
+- All portal queries scoped by `account_id` for data isolation
+- Ownership check on every zone action (zone must belong to customer's account)
+- Invalid/disabled tokens return 404 (no information leakage)
 
 ## Commands
 - `npm run build` - Compile TypeScript
@@ -51,3 +65,5 @@ Standalone scheduler that automatically pauses and resumes Soundtrack music zone
 - TypeScript strict + while loops = circular type inference — add explicit type annotations
 - node-cron needs @types/node-cron for TypeScript
 - dotenv v16 (not v17) to avoid stdout issues
+- Express 5 param types: use `req.params.id as string` cast (returns `string | string[]`)
+- Form POST handlers: always redirect after save, don't re-render same page (looks like nothing happened)
