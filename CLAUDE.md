@@ -16,7 +16,7 @@ Standalone scheduler that automatically pauses and resumes Soundtrack music zone
 - `src/scheduler.ts` - Core scheduling logic (daily refresh, pause/resume with retry)
 - `src/aladhan.ts` - Aladhan prayer times API client
 - `src/soundtrack.ts` - Soundtrack GraphQL client (adapted from soundtrack-mcp)
-- `src/queries.ts` - GraphQL queries + PLAY/PAUSE mutations
+- `src/queries.ts` - GraphQL queries + PLAY/PAUSE/ASSIGN_SOURCE mutations + ACCOUNT_LIBRARY query
 - `src/shared.ts` - Shared helpers (collectPrayers, collectDurations, DEFAULT_DURATIONS)
 - `src/routes/api.ts` - JSON API (CRUD zones, Soundtrack proxy, logs, customer management)
 - `src/routes/pages.ts` - Server-rendered pages (dashboard, forms, log, customer management)
@@ -30,7 +30,7 @@ Standalone scheduler that automatically pauses and resumes Soundtrack music zone
 ## Database Tables
 - `zone_configs` - Zone prayer time configurations
 - `prayer_times_cache` - Cached daily prayer times (from Aladhan)
-- `action_log` - Every pause/resume action with success/failure
+- `action_log` - Every pause/resume/adhan/restore action with success/failure
 - `customers` - Customer portal access (token, account_id, enabled)
 
 ## Customer Portal
@@ -58,6 +58,20 @@ Standalone scheduler that automatically pauses and resumes Soundtrack music zone
 3. Times are cached in PostgreSQL (fallback to yesterday's cache if API is down)
 4. setTimeout fires pause mutation at each prayer time, resume after configured duration
 5. All actions logged to action_log table, visible on dashboard
+
+## Call to Prayer (Adhan)
+Optional per-zone feature that plays an adhan track before each prayer time.
+
+**Flow when enabled:**
+1. X minutes before prayer → `soundZoneAssignSource` assigns adhan playlist to zone
+2. At prayer time → zone is paused (silence for prayer)
+3. After prayer duration → `soundZoneAssignSource` restores default music source
+
+**Without adhan:** standard pause → resume behavior (unchanged).
+
+**Config columns** (`zone_configs`): `adhan_enabled`, `adhan_source_id`, `adhan_lead_minutes` (default 5), `default_source_id`
+
+**Library API:** `GET /api/soundtrack/accounts/:accountId/library` returns playlists + schedules for dropdown population. Portal equivalent: `GET /:token/api/soundtrack/library`.
 
 ## Common Gotchas
 - Views and migrations are in `src/` not `dist/` — paths use `join(__dirname, '..', 'src', ...)`
