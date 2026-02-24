@@ -58,7 +58,12 @@
               <% } %>
             </div>
           </td>
-          <td><%= z.mode %></td>
+          <td>
+            <%= z.mode %>
+            <% if (z.adhan_enabled) { %>
+              <span class="badge badge--info" style="margin-left: var(--space-1);">Adhan</span>
+            <% } %>
+          </td>
           <td>
             <% if (!z.enabled) { %>
               <span class="badge badge--warning">Disabled</span>

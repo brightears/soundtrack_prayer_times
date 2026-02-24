@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { query } from "./db.js";
 import { graphql } from "./soundtrack.js";
-import { PLAY, PAUSE } from "./queries.js";
+import { PLAY, PAUSE, ASSIGN_SOURCE } from "./queries.js";
 import { fetchTimings, type PrayerName, PRAYER_NAMES } from "./aladhan.js";
 
 interface ZoneConfig {
@@ -18,6 +18,10 @@ interface ZoneConfig {
   pause_durations: Record<string, number>;
   mode: string;
   enabled: boolean;
+  adhan_enabled: boolean;
+  adhan_source_id: string | null;
+  adhan_lead_minutes: number;
+  default_source_id: string | null;
 }
 
 interface PrayerTimingsCache {
@@ -105,13 +109,13 @@ async function logAction(
 
 async function executeWithRetry(
   mutation: string,
-  zoneId: string,
+  variables: Record<string, string>,
   retries: number = 3
 ): Promise<void> {
   let lastError: Error | null = null;
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
-      await graphql(mutation, { soundZone: zoneId });
+      await graphql(mutation, variables);
       return;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
@@ -196,6 +200,8 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
   const enabledPrayers = config.prayers.split(",").map((p) => p.trim()) as PrayerName[];
   const timeouts: NodeJS.Timeout[] = [];
 
+  const useAdhan = config.adhan_enabled && config.adhan_source_id && config.default_source_id;
+
   for (const prayer of enabledPrayers) {
     if (!PRAYER_NAMES.includes(prayer)) continue;
 
@@ -213,76 +219,106 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
 
     const nowMs = now.getTime();
 
-    // Schedule pause
-    if (pauseTime.getTime() > nowMs) {
-      const delayMs = pauseTime.getTime() - nowMs;
-      const timeout = setTimeout(async () => {
-        try {
-          console.log(
-            `Pausing zone ${config.zone_name} for ${prayer} prayer`
-          );
-          await executeWithRetry(PAUSE, config.zone_id);
-          await logAction(
-            config.id,
-            config.zone_id,
-            "pause",
-            prayer,
-            pauseTime,
-            true
-          );
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.error(
-            `Failed to pause zone ${config.zone_name} for ${prayer}: ${msg}`
-          );
-          await logAction(
-            config.id,
-            config.zone_id,
-            "pause",
-            prayer,
-            pauseTime,
-            false,
-            msg
-          );
-        }
-      }, delayMs);
-      timeouts.push(timeout);
-    }
+    if (useAdhan) {
+      // --- Adhan flow: assign adhan → pause → restore default source ---
+      const adhanTime = new Date(
+        prayerTime.getTime() - config.adhan_lead_minutes * 60_000
+      );
 
-    // Schedule resume
-    if (resumeTime.getTime() > nowMs) {
-      const delayMs = resumeTime.getTime() - nowMs;
-      const timeout = setTimeout(async () => {
-        try {
-          console.log(
-            `Resuming zone ${config.zone_name} after ${prayer} prayer`
-          );
-          await executeWithRetry(PLAY, config.zone_id);
-          await logAction(
-            config.id,
-            config.zone_id,
-            "resume",
-            prayer,
-            resumeTime,
-            true
-          );
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.error(
-            `Failed to resume zone ${config.zone_name} after ${prayer}: ${msg}`
-          );
-          await logAction(
-            config.id,
-            config.zone_id,
-            "resume",
-            prayer,
-            resumeTime,
-            false,
-            msg
-          );
-        }
-      }, delayMs);
-      timeouts.push(timeout);
+      // Schedule adhan: assign call-to-prayer playlist before prayer
+      if (adhanTime.getTime() > nowMs) {
+        const delayMs = adhanTime.getTime() - nowMs;
+        const timeout = setTimeout(async () => {
+          try {
+            console.log(
+              `Playing adhan on zone ${config.zone_name} for ${prayer} prayer`
+            );
+            await executeWithRetry(ASSIGN_SOURCE, {
+              zoneId: config.zone_id,
+              sourceId: config.adhan_source_id!,
+            });
+            await logAction(config.id, config.zone_id, "adhan", prayer, adhanTime, true);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`Failed to play adhan on zone ${config.zone_name} for ${prayer}: ${msg}`);
+            await logAction(config.id, config.zone_id, "adhan", prayer, adhanTime, false, msg);
+          }
+        }, delayMs);
+        timeouts.push(timeout);
+      }
+
+      // Schedule pause at prayer time
+      if (prayerTime.getTime() > nowMs) {
+        const delayMs = prayerTime.getTime() - nowMs;
+        const timeout = setTimeout(async () => {
+          try {
+            console.log(`Pausing zone ${config.zone_name} for ${prayer} prayer`);
+            await executeWithRetry(PAUSE, { soundZone: config.zone_id });
+            await logAction(config.id, config.zone_id, "pause", prayer, prayerTime, true);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`Failed to pause zone ${config.zone_name} for ${prayer}: ${msg}`);
+            await logAction(config.id, config.zone_id, "pause", prayer, prayerTime, false, msg);
+          }
+        }, delayMs);
+        timeouts.push(timeout);
+      }
+
+      // Schedule restore: assign default source after prayer
+      if (resumeTime.getTime() > nowMs) {
+        const delayMs = resumeTime.getTime() - nowMs;
+        const timeout = setTimeout(async () => {
+          try {
+            console.log(`Restoring default music on zone ${config.zone_name} after ${prayer} prayer`);
+            await executeWithRetry(ASSIGN_SOURCE, {
+              zoneId: config.zone_id,
+              sourceId: config.default_source_id!,
+            });
+            await logAction(config.id, config.zone_id, "restore", prayer, resumeTime, true);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`Failed to restore zone ${config.zone_name} after ${prayer}: ${msg}`);
+            await logAction(config.id, config.zone_id, "restore", prayer, resumeTime, false, msg);
+          }
+        }, delayMs);
+        timeouts.push(timeout);
+      }
+    } else {
+      // --- Standard flow: pause → resume ---
+
+      // Schedule pause
+      if (pauseTime.getTime() > nowMs) {
+        const delayMs = pauseTime.getTime() - nowMs;
+        const timeout = setTimeout(async () => {
+          try {
+            console.log(`Pausing zone ${config.zone_name} for ${prayer} prayer`);
+            await executeWithRetry(PAUSE, { soundZone: config.zone_id });
+            await logAction(config.id, config.zone_id, "pause", prayer, pauseTime, true);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`Failed to pause zone ${config.zone_name} for ${prayer}: ${msg}`);
+            await logAction(config.id, config.zone_id, "pause", prayer, pauseTime, false, msg);
+          }
+        }, delayMs);
+        timeouts.push(timeout);
+      }
+
+      // Schedule resume
+      if (resumeTime.getTime() > nowMs) {
+        const delayMs = resumeTime.getTime() - nowMs;
+        const timeout = setTimeout(async () => {
+          try {
+            console.log(`Resuming zone ${config.zone_name} after ${prayer} prayer`);
+            await executeWithRetry(PLAY, { soundZone: config.zone_id });
+            await logAction(config.id, config.zone_id, "resume", prayer, resumeTime, true);
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`Failed to resume zone ${config.zone_name} after ${prayer}: ${msg}`);
+            await logAction(config.id, config.zone_id, "resume", prayer, resumeTime, false, msg);
+          }
+        }, delayMs);
+        timeouts.push(timeout);
+      }
     }
   }
 
@@ -359,7 +395,7 @@ export async function testZone(
   // Step 1: Pause
   try {
     console.log(`[TEST] Pausing zone ${zoneId} for ${pauseSeconds}s...`);
-    await executeWithRetry(PAUSE, zoneId);
+    await executeWithRetry(PAUSE, { soundZone: zoneId });
     await logAction(configId, zoneId, "test-pause", "test", new Date(), true);
     result.paused = true;
   } catch (err) {
@@ -375,7 +411,7 @@ export async function testZone(
   // Step 3: Resume
   try {
     console.log(`[TEST] Resuming zone ${zoneId}...`);
-    await executeWithRetry(PLAY, zoneId);
+    await executeWithRetry(PLAY, { soundZone: zoneId });
     await logAction(configId, zoneId, "test-resume", "test", new Date(), true);
     result.resumed = true;
   } catch (err) {

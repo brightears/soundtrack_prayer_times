@@ -74,3 +74,36 @@ mutation Pause($soundZone: ID!) {
     __typename
   }
 }`;
+
+// Mutation for assigning a playlist/schedule to a sound zone
+export const ASSIGN_SOURCE = `
+mutation AssignSource($zoneId: ID!, $sourceId: ID!) {
+  soundZoneAssignSource(input: { soundZones: [$zoneId], source: $sourceId }) {
+    soundZones
+  }
+}`;
+
+// Query for fetching an account's music library (playlists + schedules)
+export const ACCOUNT_LIBRARY = `
+query AccountLibrary($accountId: ID!) {
+  account(id: $accountId) {
+    musicLibrary {
+      playlists(first: 200) {
+        edges {
+          node {
+            id
+            name
+          }
+        }
+      }
+      schedules(first: 200) {
+        edges {
+          node {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+}`;

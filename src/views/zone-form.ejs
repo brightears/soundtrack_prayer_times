@@ -177,6 +177,48 @@
     </div>
   </div>
 
+  <!-- Call to Prayer (Adhan) -->
+  <div class="form-section" id="adhan-section">
+    <div class="form-section__title">Call to Prayer (Adhan)</div>
+
+    <div class="field">
+      <label class="field__label">Enable Adhan</label>
+      <select name="adhan_enabled" id="adhan-enabled" class="field__select" style="width: 8rem;">
+        <option value="false" <%= !zone || !zone.adhan_enabled ? 'selected' : '' %>>No</option>
+        <option value="true" <%= zone && zone.adhan_enabled ? 'selected' : '' %>>Yes</option>
+      </select>
+      <p class="text-muted" style="margin-top: var(--space-1); font-size: 0.8rem;">
+        Plays a call to prayer track before each prayer time, then pauses for prayer.
+      </p>
+    </div>
+
+    <div id="adhan-fields" style="<%= !zone || !zone.adhan_enabled ? 'opacity: 0.4; pointer-events: none;' : '' %>">
+      <div class="field">
+        <label class="field__label">Adhan Playlist</label>
+        <select name="adhan_source_id" id="adhan-source" class="field__select">
+          <option value="">Select playlist...</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="field__label">Default Music Source</label>
+        <select name="default_source_id" id="default-source" class="field__select">
+          <option value="">Select playlist or schedule...</option>
+        </select>
+        <p class="text-muted" style="margin-top: var(--space-1); font-size: 0.8rem;">
+          The playlist or schedule to restore after prayer ends.
+        </p>
+      </div>
+
+      <div class="field">
+        <label class="field__label">Lead Time (minutes before prayer)</label>
+        <input type="number" name="adhan_lead_minutes" class="field__input"
+          min="1" max="15" value="<%= zone ? zone.adhan_lead_minutes : 5 %>"
+          style="width: 8rem;">
+      </div>
+    </div>
+  </div>
+
   <!-- Actions -->
   <div style="display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap;">
     <button type="submit" class="btn btn--primary btn--lg"><%= zone ? 'Save Changes' : 'Add Zone' %></button>
@@ -239,6 +281,61 @@
       document.getElementById('zone-name').value = opt.dataset.zoneName || '';
     });
   });
+
+  // Adhan toggle
+  const adhanEnabled = document.getElementById('adhan-enabled');
+  const adhanFields = document.getElementById('adhan-fields');
+  if (adhanEnabled && adhanFields) {
+    adhanEnabled.addEventListener('change', () => {
+      const on = adhanEnabled.value === 'true';
+      adhanFields.style.opacity = on ? '1' : '0.4';
+      adhanFields.style.pointerEvents = on ? 'auto' : 'none';
+    });
+  }
+
+  // Library loader for adhan/default source dropdowns
+  function loadLibrary(accountId) {
+    if (!accountId) return;
+    fetch('/api/soundtrack/accounts/' + accountId + '/library')
+      .then(r => r.json())
+      .then(lib => {
+        const adhanSelect = document.getElementById('adhan-source');
+        const defaultSelect = document.getElementById('default-source');
+        const savedAdhan = '<%= zone ? (zone.adhan_source_id || "") : "" %>';
+        const savedDefault = '<%= zone ? (zone.default_source_id || "") : "" %>';
+
+        if (adhanSelect) {
+          adhanSelect.innerHTML = '<option value="">Select playlist...</option>' +
+            lib.playlists.map(p =>
+              '<option value="' + p.id + '"' + (p.id === savedAdhan ? ' selected' : '') + '>' + p.name + '</option>'
+            ).join('');
+        }
+
+        if (defaultSelect) {
+          const allSources = [
+            ...lib.playlists.map(p => ({ ...p, type: 'Playlist' })),
+            ...lib.schedules.map(s => ({ ...s, type: 'Schedule' })),
+          ];
+          defaultSelect.innerHTML = '<option value="">Select playlist or schedule...</option>' +
+            allSources.map(s =>
+              '<option value="' + s.id + '"' + (s.id === savedDefault ? ' selected' : '') + '>' + s.name + ' (' + s.type + ')</option>'
+            ).join('');
+        }
+      })
+      .catch(() => {});
+  }
+
+  <% if (zone) { %>
+    // Edit mode: load library for existing zone's account
+    loadLibrary('<%= zone.account_id %>');
+  <% } else { %>
+    // Add mode: load library when account changes
+    if (accountSelect) {
+      accountSelect.addEventListener('change', () => {
+        if (accountSelect.value) loadLibrary(accountSelect.value);
+      });
+    }
+  <% } %>
 
   // Delete button
   const deleteBtn = document.getElementById('delete-btn');

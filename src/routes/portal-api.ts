@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { query } from "../db.js";
 import { graphql, extractNodes } from "../soundtrack.js";
-import { LOCATION_SOUND_ZONES } from "../queries.js";
+import { LOCATION_SOUND_ZONES, ACCOUNT_LIBRARY } from "../queries.js";
 import { testZone, refreshZone } from "../scheduler.js";
 import { portalAuth } from "../middleware/portal-auth.js";
 
@@ -120,6 +120,33 @@ router.get(
       }));
     });
     res.json(zones);
+  })
+);
+
+// ── Soundtrack Library (scoped to customer's account) ────────────────────
+
+router.get(
+  "/:token/api/soundtrack/library",
+  wrap(async (req, res) => {
+    const customer = req.customer!;
+    const result = await graphql<{
+      account: {
+        musicLibrary: {
+          playlists: {
+            edges: Array<{ node: { id: string; name: string } }>;
+          };
+          schedules: {
+            edges: Array<{ node: { id: string; name: string } }>;
+          };
+        };
+      };
+    }>(ACCOUNT_LIBRARY, { accountId: customer.account_id });
+
+    const library = result.data!.account.musicLibrary;
+    res.json({
+      playlists: extractNodes(library.playlists),
+      schedules: extractNodes(library.schedules),
+    });
   })
 );
 

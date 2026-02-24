@@ -88,8 +88,9 @@ router.post("/zones/create", async (req: Request, res: Response) => {
       `INSERT INTO zone_configs
        (account_id, account_name, location_id, location_name, zone_id, zone_name,
         city, country, timezone, method, asr_school,
-        prayers, pause_offset_minutes, pause_durations, mode, enabled)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        prayers, pause_offset_minutes, pause_durations, mode, enabled,
+        adhan_enabled, adhan_source_id, adhan_lead_minutes, default_source_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
        RETURNING *`,
       [
         b.account_id,
@@ -108,6 +109,10 @@ router.post("/zones/create", async (req: Request, res: Response) => {
         JSON.stringify(durations),
         b.mode || "year-round",
         b.enabled !== "false",
+        b.adhan_enabled === "true",
+        b.adhan_source_id || null,
+        Number(b.adhan_lead_minutes) || 5,
+        b.default_source_id || null,
       ]
     );
 
@@ -152,8 +157,11 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
       `UPDATE zone_configs SET
         city = $1, country = $2, timezone = $3, method = $4, asr_school = $5,
         prayers = $6, pause_offset_minutes = $7, pause_durations = $8,
-        mode = $9, enabled = $10, updated_at = NOW()
-       WHERE id = $11 RETURNING *`,
+        mode = $9, enabled = $10,
+        adhan_enabled = $11, adhan_source_id = $12,
+        adhan_lead_minutes = $13, default_source_id = $14,
+        updated_at = NOW()
+       WHERE id = $15 RETURNING *`,
       [
         b.city,
         b.country,
@@ -165,6 +173,10 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
         JSON.stringify(durations),
         b.mode || "year-round",
         b.enabled !== "false",
+        b.adhan_enabled === "true",
+        b.adhan_source_id || null,
+        Number(b.adhan_lead_minutes) || 5,
+        b.default_source_id || null,
         req.params.id,
       ]
     );

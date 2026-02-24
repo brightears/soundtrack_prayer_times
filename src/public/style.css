@@ -521,6 +521,7 @@ button, input, select, textarea { font-family: inherit; font-size: inherit; }
 .badge--error   { background: rgba(239,68,68,0.15); color: var(--color-error); }
 .badge--warning { background: rgba(245,158,11,0.15); color: var(--color-warning); }
 .badge--pending { background: rgba(107,114,128,0.15); color: var(--color-pending); }
+.badge--info    { background: rgba(99,179,237,0.15); color: #63b3ed; }
 
 /* ── Data Table ──────────────────────────────────────────────────────────── */
 .data-table {

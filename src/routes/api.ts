@@ -6,6 +6,7 @@ import {
   ME_ACCOUNTS_PAGE,
   ACCOUNT_LOCATIONS,
   LOCATION_SOUND_ZONES,
+  ACCOUNT_LIBRARY,
 } from "../queries.js";
 import { refreshZone, refreshAllSchedules, testZone } from "../scheduler.js";
 
@@ -70,6 +71,10 @@ router.post(
       pause_durations,
       mode,
       enabled,
+      adhan_enabled,
+      adhan_source_id,
+      adhan_lead_minutes,
+      default_source_id,
     } = req.body;
 
     const defaultDurations = { Fajr: 15, Dhuhr: 20, Asr: 15, Maghrib: 15, Isha: 20 };
@@ -78,8 +83,9 @@ router.post(
       `INSERT INTO zone_configs
        (account_id, account_name, location_id, location_name, zone_id, zone_name,
         city, country, latitude, longitude, timezone, method, asr_school,
-        prayers, pause_offset_minutes, pause_durations, mode, enabled)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+        prayers, pause_offset_minutes, pause_durations, mode, enabled,
+        adhan_enabled, adhan_source_id, adhan_lead_minutes, default_source_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
        RETURNING *`,
       [
         account_id,
@@ -100,6 +106,10 @@ router.post(
         JSON.stringify(pause_durations ?? defaultDurations),
         mode ?? "year-round",
         enabled ?? true,
+        adhan_enabled ?? false,
+        adhan_source_id || null,
+        adhan_lead_minutes ?? 5,
+        default_source_id || null,
       ]
     );
 
@@ -130,6 +140,10 @@ router.put(
       pause_durations,
       mode,
       enabled,
+      adhan_enabled,
+      adhan_source_id,
+      adhan_lead_minutes,
+      default_source_id,
     } = req.body;
 
     const result = await query(
@@ -137,8 +151,11 @@ router.put(
         city = $1, country = $2, latitude = $3, longitude = $4,
         timezone = $5, method = $6, asr_school = $7, prayers = $8,
         pause_offset_minutes = $9, pause_durations = $10,
-        mode = $11, enabled = $12, updated_at = NOW()
-       WHERE id = $13 RETURNING *`,
+        mode = $11, enabled = $12,
+        adhan_enabled = $13, adhan_source_id = $14,
+        adhan_lead_minutes = $15, default_source_id = $16,
+        updated_at = NOW()
+       WHERE id = $17 RETURNING *`,
       [
         city,
         country,
@@ -152,6 +169,10 @@ router.put(
         JSON.stringify(pause_durations),
         mode,
         enabled,
+        adhan_enabled ?? false,
+        adhan_source_id || null,
+        adhan_lead_minutes ?? 5,
+        default_source_id || null,
         req.params.id,
       ]
     );
@@ -331,6 +352,32 @@ router.get(
       }));
     });
     res.json(zones);
+  })
+);
+
+// ── Soundtrack Music Library (for adhan/default source pickers) ──────────
+
+router.get(
+  "/soundtrack/accounts/:accountId/library",
+  wrap(async (req, res) => {
+    const result = await graphql<{
+      account: {
+        musicLibrary: {
+          playlists: {
+            edges: Array<{ node: { id: string; name: string } }>;
+          };
+          schedules: {
+            edges: Array<{ node: { id: string; name: string } }>;
+          };
+        };
+      };
+    }>(ACCOUNT_LIBRARY, { accountId: req.params.accountId as string });
+
+    const library = result.data!.account.musicLibrary;
+    res.json({
+      playlists: extractNodes(library.playlists),
+      schedules: extractNodes(library.schedules),
+    });
   })
 );
 
