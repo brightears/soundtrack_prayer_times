@@ -8,13 +8,13 @@ Standalone scheduler that automatically pauses and resumes Soundtrack music zone
 - **Backend**: Express 5 + EJS templates + HTMX
 - **Database**: PostgreSQL (Render managed)
 - **Scheduler**: node-cron (daily refresh) + setTimeout (per-prayer pause/resume)
-- **APIs**: Soundtrack GraphQL (pause/play) + Aladhan (prayer times, free, no auth)
+- **APIs**: Soundtrack GraphQL (pause/play) + Prayer time providers (Aladhan, PrayCalendar — configurable per zone)
 
 ## Key Files
 - `src/server.ts` - Express app, admin auth, starts scheduler
 - `src/db.ts` - PostgreSQL pool + migration runner
 - `src/scheduler.ts` - Core scheduling logic (daily refresh, pause/resume with retry)
-- `src/aladhan.ts` - Aladhan prayer times API client
+- `src/aladhan.ts` - Multi-provider prayer times client (Aladhan, PrayCalendar)
 - `src/soundtrack.ts` - Soundtrack GraphQL client (adapted from soundtrack-mcp)
 - `src/queries.ts` - GraphQL queries + PLAY/PAUSE/ASSIGN_SOURCE mutations + ACCOUNT_LIBRARY query
 - `src/shared.ts` - Shared helpers (collectPrayers, collectDurations, DEFAULT_DURATIONS)
@@ -53,8 +53,8 @@ Standalone scheduler that automatically pauses and resumes Soundtrack music zone
 - `PORT` - Server port (default 3000)
 
 ## How It Works
-1. Admin configures zones via web UI (account/zone, city, timezone, calculation method, prayers, duration)
-2. Scheduler fetches prayer times from Aladhan API daily at midnight
+1. Admin configures zones via web UI (account/zone, city, timezone, calculation method, prayer source, prayers, duration)
+2. Scheduler fetches prayer times from configured provider (Aladhan or PrayCalendar) daily at midnight
 3. Times are cached in PostgreSQL (fallback to yesterday's cache if API is down)
 4. setTimeout fires pause mutation at each prayer time, resume after configured duration
 5. All actions logged to action_log table, visible on dashboard
@@ -72,6 +72,15 @@ Optional per-zone feature that plays an adhan track before each prayer time.
 **Config columns** (`zone_configs`): `adhan_enabled`, `adhan_source_id`, `adhan_lead_minutes` (default 5), `default_source_id`
 
 **Library API:** `GET /api/soundtrack/accounts/:accountId/library` returns playlists + schedules for dropdown population. Portal equivalent: `GET /:token/api/soundtrack/library`.
+
+## Prayer Time Sources
+Configurable per zone — `prayer_source` column defaults to `"aladhan"`.
+
+**Supported providers:**
+- **Aladhan** (aladhan.com) — free, no auth, city/country lookup
+- **PrayCalendar** (pray.ahmedelywa.com) — free, no auth, address-based lookup
+
+Provider list defined in `PRAYER_SOURCES` map in `src/aladhan.ts`. Adding a new provider requires: adding a fetch function, mapping calculation methods, and adding an entry to `PRAYER_SOURCES`.
 
 ## Common Gotchas
 - Views and migrations are in `src/` not `dist/` — paths use `join(__dirname, '..', 'src', ...)`
