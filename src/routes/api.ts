@@ -75,6 +75,7 @@ router.post(
       adhan_source_id,
       adhan_lead_minutes,
       default_source_id,
+      prayer_source,
     } = req.body;
 
     const defaultDurations = { Fajr: 15, Dhuhr: 20, Asr: 15, Maghrib: 15, Isha: 20 };
@@ -84,8 +85,9 @@ router.post(
        (account_id, account_name, location_id, location_name, zone_id, zone_name,
         city, country, latitude, longitude, timezone, method, asr_school,
         prayers, pause_offset_minutes, pause_durations, mode, enabled,
-        adhan_enabled, adhan_source_id, adhan_lead_minutes, default_source_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+        adhan_enabled, adhan_source_id, adhan_lead_minutes, default_source_id,
+        prayer_source)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
        RETURNING *`,
       [
         account_id,
@@ -110,6 +112,7 @@ router.post(
         adhan_source_id || null,
         adhan_lead_minutes ?? 5,
         default_source_id || null,
+        prayer_source || "aladhan",
       ]
     );
 
@@ -144,6 +147,7 @@ router.put(
       adhan_source_id,
       adhan_lead_minutes,
       default_source_id,
+      prayer_source,
     } = req.body;
 
     const result = await query(
@@ -154,8 +158,9 @@ router.put(
         mode = $11, enabled = $12,
         adhan_enabled = $13, adhan_source_id = $14,
         adhan_lead_minutes = $15, default_source_id = $16,
+        prayer_source = $17,
         updated_at = NOW()
-       WHERE id = $17 RETURNING *`,
+       WHERE id = $18 RETURNING *`,
       [
         city,
         country,
@@ -173,6 +178,7 @@ router.put(
         adhan_source_id || null,
         adhan_lead_minutes ?? 5,
         default_source_id || null,
+        prayer_source || "aladhan",
         req.params.id,
       ]
     );

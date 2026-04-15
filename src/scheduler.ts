@@ -18,6 +18,7 @@ interface ZoneConfig {
   pause_durations: Record<string, number>;
   mode: string;
   enabled: boolean;
+  prayer_source: string;
   adhan_enabled: boolean;
   adhan_source_id: string | null;
   adhan_lead_minutes: number;
@@ -158,6 +159,7 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
       country: config.country,
       method: config.method,
       school: config.asr_school,
+      source: config.prayer_source,
     });
     timings = {
       Fajr: fetched.Fajr,

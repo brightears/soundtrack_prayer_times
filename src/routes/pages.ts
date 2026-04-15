@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { randomBytes } from "crypto";
 import { query } from "../db.js";
-import { CALCULATION_METHODS } from "../aladhan.js";
+import { CALCULATION_METHODS, PRAYER_SOURCES } from "../aladhan.js";
 import { getSchedulerStatus, refreshZone } from "../scheduler.js";
 import { collectPrayers, collectDurations } from "../shared.js";
 
@@ -39,6 +39,7 @@ router.get("/zones/new", (_req: Request, res: Response) => {
   res.render("zone-form", {
     zone: null,
     methods: CALCULATION_METHODS,
+    prayerSources: PRAYER_SOURCES,
     error: null,
     currentPage: "zones-new",
   });
@@ -58,6 +59,7 @@ router.get("/zones/:id/edit", async (req: Request, res: Response) => {
     res.render("zone-form", {
       zone: result.rows[0],
       methods: CALCULATION_METHODS,
+    prayerSources: PRAYER_SOURCES,
       error: null,
       currentPage: "zones-new",
     });
@@ -77,6 +79,7 @@ router.post("/zones/create", async (req: Request, res: Response) => {
       res.render("zone-form", {
         zone: null,
         methods: CALCULATION_METHODS,
+    prayerSources: PRAYER_SOURCES,
         error: "Select at least one prayer.",
         currentPage: "zones-new",
       });
@@ -89,8 +92,9 @@ router.post("/zones/create", async (req: Request, res: Response) => {
        (account_id, account_name, location_id, location_name, zone_id, zone_name,
         city, country, timezone, method, asr_school,
         prayers, pause_offset_minutes, pause_durations, mode, enabled,
-        adhan_enabled, adhan_source_id, adhan_lead_minutes, default_source_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+        adhan_enabled, adhan_source_id, adhan_lead_minutes, default_source_id,
+        prayer_source)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
        RETURNING *`,
       [
         b.account_id,
@@ -113,6 +117,7 @@ router.post("/zones/create", async (req: Request, res: Response) => {
         b.adhan_source_id || null,
         Number(b.adhan_lead_minutes) || 5,
         b.default_source_id || null,
+        b.prayer_source || "aladhan",
       ]
     );
 
@@ -127,6 +132,7 @@ router.post("/zones/create", async (req: Request, res: Response) => {
     res.render("zone-form", {
       zone: null,
       methods: CALCULATION_METHODS,
+    prayerSources: PRAYER_SOURCES,
       error: msg,
       currentPage: "zones-new",
     });
@@ -146,6 +152,7 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
       res.render("zone-form", {
         zone: existing.rows[0] ?? null,
         methods: CALCULATION_METHODS,
+    prayerSources: PRAYER_SOURCES,
         error: "Select at least one prayer.",
         currentPage: "zones-new",
       });
@@ -155,14 +162,24 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
     const durations = collectDurations(b);
     const result = await query(
       `UPDATE zone_configs SET
-        city = $1, country = $2, timezone = $3, method = $4, asr_school = $5,
-        prayers = $6, pause_offset_minutes = $7, pause_durations = $8,
-        mode = $9, enabled = $10,
-        adhan_enabled = $11, adhan_source_id = $12,
-        adhan_lead_minutes = $13, default_source_id = $14,
+        account_id = $1, account_name = $2,
+        location_id = $3, location_name = $4,
+        zone_id = $5, zone_name = $6,
+        city = $7, country = $8, timezone = $9, method = $10, asr_school = $11,
+        prayers = $12, pause_offset_minutes = $13, pause_durations = $14,
+        mode = $15, enabled = $16,
+        adhan_enabled = $17, adhan_source_id = $18,
+        adhan_lead_minutes = $19, default_source_id = $20,
+        prayer_source = $21,
         updated_at = NOW()
-       WHERE id = $15 RETURNING *`,
+       WHERE id = $22 RETURNING *`,
       [
+        b.account_id,
+        b.account_name,
+        b.location_id,
+        b.location_name,
+        b.zone_id,
+        b.zone_name,
         b.city,
         b.country,
         b.timezone,
@@ -177,6 +194,7 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
         b.adhan_source_id || null,
         Number(b.adhan_lead_minutes) || 5,
         b.default_source_id || null,
+        b.prayer_source || "aladhan",
         req.params.id,
       ]
     );
@@ -196,6 +214,7 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
     res.render("zone-form", {
       zone: existing.rows[0] ?? null,
       methods: CALCULATION_METHODS,
+    prayerSources: PRAYER_SOURCES,
       error: msg,
       currentPage: "zones-new",
     });

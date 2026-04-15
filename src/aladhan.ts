@@ -1,7 +1,9 @@
-// Aladhan Prayer Times API client
-// https://aladhan.com/prayer-times-api
+// Prayer Times API client
+// Supports multiple providers: Aladhan, PrayCalendar
+// Default: Aladhan (https://aladhan.com/prayer-times-api)
 
-const BASE_URL = "https://api.aladhan.com/v1";
+const ALADHAN_BASE_URL = "https://api.aladhan.com/v1";
+const PRAYCALENDAR_BASE_URL = "https://pray.ahmedelywa.com";
 
 export interface PrayerTimings {
   Fajr: string;
@@ -112,21 +114,44 @@ async function fetchWithRetry(
   throw lastError ?? new Error("Aladhan API request failed");
 }
 
+// Available prayer time sources
+export const PRAYER_SOURCES: Record<string, string> = {
+  aladhan: "Aladhan (aladhan.com)",
+  praycalendar: "PrayCalendar (pray.ahmedelywa.com)",
+};
+
 export interface FetchTimingsParams {
   city: string;
   country: string;
   method: number;
   school: number; // 0=Shafi'i, 1=Hanafi
   date?: Date;
+  source?: string; // prayer time provider (default: aladhan)
 }
 
 export async function fetchTimings(
   params: FetchTimingsParams
 ): Promise<PrayerTimings> {
+  const source = params.source || "aladhan";
+
+  switch (source) {
+    case "praycalendar":
+      return fetchFromPrayCalendar(params);
+    case "aladhan":
+    default:
+      return fetchFromAladhan(params);
+  }
+}
+
+// ── Aladhan provider ────────────────────────────────────────────────────
+
+async function fetchFromAladhan(
+  params: FetchTimingsParams
+): Promise<PrayerTimings> {
   const date = params.date ?? new Date();
   const dateStr = `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
 
-  const url = new URL(`${BASE_URL}/timingsByCity/${dateStr}`);
+  const url = new URL(`${ALADHAN_BASE_URL}/timingsByCity/${dateStr}`);
   url.searchParams.set("city", params.city);
   url.searchParams.set("country", params.country);
   url.searchParams.set("method", String(params.method));
@@ -142,6 +167,75 @@ export async function fetchTimings(
   return extractTimings(json.data.timings);
 }
 
+// ── PrayCalendar provider ───────────────────────────────────────────────
+
+interface PrayCalendarResponse {
+  date: string;
+  prayer_times: {
+    fajr: string;
+    sunrise: string;
+    dhuhr: string;
+    asr: string;
+    maghrib: string;
+    isha: string;
+  };
+}
+
+// Map Aladhan method numbers to PrayCalendar method names
+const PRAYCALENDAR_METHODS: Record<number, string> = {
+  0: "Shia", // closest match
+  1: "Karachi",
+  2: "ISNA",
+  3: "MWL",
+  4: "Makkah",
+  5: "Egypt",
+  7: "Gulf",
+  8: "Kuwait",
+  9: "Qatar",
+  10: "Singapore",
+  11: "France",
+  12: "Turkey",
+  13: "Russia",
+  14: "Tehran",
+  15: "Shia",
+  16: "JAKIM",
+  17: "Tunisia",
+  18: "Algeria",
+  19: "KEMENAG",
+  20: "Morocco",
+  21: "Portugal",
+  22: "Jordan",
+};
+
+async function fetchFromPrayCalendar(
+  params: FetchTimingsParams
+): Promise<PrayerTimings> {
+  const address = `${params.city}, ${params.country}`;
+  const method = PRAYCALENDAR_METHODS[params.method] || "MWL";
+
+  const url = new URL(`${PRAYCALENDAR_BASE_URL}/api/prayer-times.json`);
+  url.searchParams.set("address", address);
+  url.searchParams.set("method", method);
+
+  const response = await fetchWithRetry(url.toString());
+  const json = (await response.json()) as PrayCalendarResponse;
+
+  if (!json.prayer_times) {
+    throw new Error("PrayCalendar API returned no prayer times");
+  }
+
+  return {
+    Fajr: json.prayer_times.fajr,
+    Sunrise: json.prayer_times.sunrise,
+    Dhuhr: json.prayer_times.dhuhr,
+    Asr: json.prayer_times.asr,
+    Maghrib: json.prayer_times.maghrib,
+    Isha: json.prayer_times.isha,
+  };
+}
+
+// ── Month calendar (Aladhan only) ───────────────────────────────────────
+
 export interface FetchMonthParams {
   year: number;
   month: number; // 1-12
@@ -155,7 +249,7 @@ export async function fetchMonthCalendar(
   params: FetchMonthParams
 ): Promise<Array<{ date: string; timings: PrayerTimings }>> {
   const url = new URL(
-    `${BASE_URL}/calendarByCity/${params.year}/${params.month}`
+    `${ALADHAN_BASE_URL}/calendarByCity/${params.year}/${params.month}`
   );
   url.searchParams.set("city", params.city);
   url.searchParams.set("country", params.country);

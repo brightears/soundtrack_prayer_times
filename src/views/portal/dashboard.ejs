@@ -79,6 +79,7 @@
             <div style="display: flex; gap: var(--space-2); align-items: center;">
               <button class="btn btn--ghost btn--sm test-btn" data-id="<%= z.id %>" type="button">Test</button>
               <a href="<%= basePath %>/zones/<%= z.id %>/edit" class="btn btn--secondary btn--sm">Edit</a>
+              <button class="btn btn--danger btn--sm delete-btn" data-id="<%= z.id %>" data-name="<%= z.zone_name %>" type="button">Delete</button>
             </div>
           </td>
         </tr>
@@ -89,6 +90,24 @@
 <% } %>
 
 <script>
+  // Delete buttons
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const name = btn.dataset.name;
+      if (!confirm('Delete "' + name + '"? This cannot be undone.')) return;
+      btn.classList.add('btn--loading');
+      btn.disabled = true;
+      try {
+        await fetch('<%= basePath %>/api/zones/' + btn.dataset.id, { method: 'DELETE' });
+        location.reload();
+      } catch (err) {
+        btn.classList.remove('btn--loading');
+        btn.disabled = false;
+      }
+    });
+  });
+
+  // Test buttons
   document.querySelectorAll('.test-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.id;

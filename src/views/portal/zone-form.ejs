@@ -18,7 +18,6 @@
 
 <form method="POST" action="<%= zone ? basePath + '/zones/' + zone.id + '/update' : basePath + '/zones/create' %>" id="zone-form" style="max-width: 720px;">
 
-  <% if (!zone) { %>
   <!-- Zone Selection (account locked) -->
   <div class="form-section">
     <div class="form-section__title">Sound Zone</div>
@@ -31,24 +30,31 @@
     <div class="field">
       <label class="field__label field__label--required">Zone</label>
       <select name="zone_id" id="zone-select" class="field__select" required>
-        <option value="">Loading zones...</option>
+        <% if (zone) { %>
+          <option value="<%= zone.zone_id %>" selected><%= zone.location_name %> / <%= zone.zone_name %></option>
+        <% } else { %>
+          <option value="">Loading zones...</option>
+        <% } %>
       </select>
     </div>
 
-    <input type="hidden" name="location_id" id="location-id">
-    <input type="hidden" name="location_name" id="location-name">
-    <input type="hidden" name="zone_name" id="zone-name">
+    <input type="hidden" name="location_id" id="location-id" value="<%= zone ? zone.location_id : '' %>">
+    <input type="hidden" name="location_name" id="location-name" value="<%= zone ? zone.location_name : '' %>">
+    <input type="hidden" name="zone_name" id="zone-name" value="<%= zone ? zone.zone_name : '' %>">
   </div>
-  <% } else { %>
-  <div class="form-section">
-    <div class="form-section__title">Sound Zone</div>
-    <p style="margin: 0;"><span class="text-bold"><%= zone.zone_name %></span> <span class="text-muted">(<%= customer.account_name %>)</span></p>
-  </div>
-  <% } %>
 
   <!-- Prayer Time Location -->
   <div class="form-section">
     <div class="form-section__title">Prayer Time Location</div>
+
+    <div class="field">
+      <label class="field__label">Prayer Time Source</label>
+      <select name="prayer_source" class="field__select" style="width: 20rem;">
+        <% for (const [id, name] of Object.entries(prayerSources)) { %>
+          <option value="<%= id %>" <%= zone && zone.prayer_source === id ? 'selected' : (!zone && id === 'aladhan' ? 'selected' : '') %>><%= name %></option>
+        <% } %>
+      </select>
+    </div>
 
     <div class="grid-2">
       <div class="field">
@@ -227,9 +233,11 @@
 </form>
 
 <script>
-  // Load zones for the customer's account (only on add form)
+  // Load zones for the customer's account
   document.addEventListener('DOMContentLoaded', () => {
     const zoneSelect = document.getElementById('zone-select');
+    const savedZoneId = '<%= zone ? zone.zone_id : "" %>';
+
     if (zoneSelect) {
       fetch('<%= basePath %>/api/soundtrack/zones')
         .then(r => r.json())
@@ -241,7 +249,8 @@
           zoneSelect.innerHTML = '<option value="">Select zone...</option>' +
             zones.map(z =>
               '<option value="' + z.id + '" data-location-id="' + z.locationId +
-              '" data-location-name="' + z.locationName + '" data-zone-name="' + z.name + '">' +
+              '" data-location-name="' + z.locationName + '" data-zone-name="' + z.name + '"' +
+              (z.id === savedZoneId ? ' selected' : '') + '>' +
               z.locationName + ' / ' + z.name + (z.isPaired ? '' : ' (unpaired)') +
               '</option>'
             ).join('');
