@@ -3,6 +3,7 @@ import { query } from "./db.js";
 import { graphql } from "./soundtrack.js";
 import { PLAY, PAUSE, ASSIGN_SOURCE } from "./queries.js";
 import { fetchTimings, type PrayerName, PRAYER_NAMES } from "./aladhan.js";
+import { clampPauseDuration, MAX_PAUSE_MINUTES } from "./shared.js";
 
 interface ZoneConfig {
   id: number;
@@ -214,9 +215,18 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
     const pauseTime = new Date(
       prayerTime.getTime() - config.pause_offset_minutes * 60_000
     );
-    const durationMinutes = config.pause_durations[prayer] ?? 20;
+    const rawDuration = config.pause_durations[prayer];
+    const durationMinutes = clampPauseDuration(rawDuration, prayer);
+    if (rawDuration !== undefined && rawDuration > MAX_PAUSE_MINUTES) {
+      console.warn(
+        `[${config.zone_name}] ${prayer} pause_durations value ${rawDuration}min exceeds MAX_PAUSE_MINUTES (${MAX_PAUSE_MINUTES}); clamping to ${durationMinutes}min`
+      );
+    }
     const resumeTime = new Date(
       prayerTime.getTime() + durationMinutes * 60_000
+    );
+    console.log(
+      `[${config.zone_name}] ${prayer}: pause ${pauseTime.toISOString()} → resume ${resumeTime.toISOString()} (duration ${durationMinutes}min)`
     );
 
     const nowMs = now.getTime();
