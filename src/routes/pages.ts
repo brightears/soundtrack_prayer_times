@@ -226,7 +226,7 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
 router.get("/log", async (_req: Request, res: Response) => {
   try {
     const result = await query(
-      `SELECT al.*, zc.zone_name, zc.account_name
+      `SELECT al.*, zc.zone_name, zc.account_name, zc.timezone AS zone_timezone
        FROM action_log al
        JOIN zone_configs zc ON zc.id = al.zone_config_id
        ORDER BY al.created_at DESC

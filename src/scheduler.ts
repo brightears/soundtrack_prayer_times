@@ -37,6 +37,12 @@ interface PrayerTimingsCache {
 // Active timeouts per zone config ID
 const activeTimeouts = new Map<number, NodeJS.Timeout[]>();
 
+// Surfaced in Activity Log when a scheduled time was already past at refresh —
+// the dominant root cause is a Render restart between fire-time and the next
+// daily refresh; without this entry the miss is invisible.
+const SKIPPED_PAST_MSG =
+  "Skipped: scheduled time was already in the past at last refresh (likely Render restart between fire-time and refresh, or daily refresh ran after the prayer)";
+
 // Track the midnight cron task
 let midnightTask: cron.ScheduledTask | null = null;
 
@@ -257,6 +263,8 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
           }
         }, delayMs);
         timeouts.push(timeout);
+      } else {
+        await logAction(config.id, config.zone_id, "adhan", prayer, adhanTime, false, SKIPPED_PAST_MSG);
       }
 
       // Schedule pause at prayer time
@@ -274,6 +282,8 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
           }
         }, delayMs);
         timeouts.push(timeout);
+      } else {
+        await logAction(config.id, config.zone_id, "pause", prayer, prayerTime, false, SKIPPED_PAST_MSG);
       }
 
       // Schedule restore: assign default source after prayer
@@ -294,6 +304,8 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
           }
         }, delayMs);
         timeouts.push(timeout);
+      } else {
+        await logAction(config.id, config.zone_id, "restore", prayer, resumeTime, false, SKIPPED_PAST_MSG);
       }
     } else {
       // --- Standard flow: pause → resume ---
@@ -313,6 +325,8 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
           }
         }, delayMs);
         timeouts.push(timeout);
+      } else {
+        await logAction(config.id, config.zone_id, "pause", prayer, pauseTime, false, SKIPPED_PAST_MSG);
       }
 
       // Schedule resume
@@ -330,6 +344,8 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
           }
         }, delayMs);
         timeouts.push(timeout);
+      } else {
+        await logAction(config.id, config.zone_id, "resume", prayer, resumeTime, false, SKIPPED_PAST_MSG);
       }
     }
   }

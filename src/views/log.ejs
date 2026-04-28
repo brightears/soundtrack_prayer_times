@@ -26,7 +26,8 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th>Time</th>
+          <th>Time (zone local)</th>
+          <th>TZ</th>
           <th>Zone</th>
           <th>Account</th>
           <th>Action</th>
@@ -38,7 +39,8 @@
       <tbody>
         <% for (const log of logs) { %>
         <tr>
-          <td style="white-space: nowrap;"><%= new Date(log.executed_at).toLocaleString() %></td>
+          <td style="white-space: nowrap;"><%= new Date(log.executed_at).toLocaleString('en-GB', { timeZone: log.zone_timezone || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) %></td>
+          <td style="white-space: nowrap;" class="text-muted"><%= log.zone_timezone || 'UTC' %></td>
           <td class="text-bold"><%= log.zone_name %></td>
           <td><%= log.account_name %></td>
           <td>
