@@ -12,16 +12,61 @@
   </div>
 </div>
 
+<div class="card" style="margin-bottom: 1rem;">
+  <form method="get" action="/log" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; align-items: end;">
+    <div>
+      <label class="field__label">Zone</label>
+      <select name="zone" class="field__select">
+        <option value="">All zones</option>
+        <% for (const z of zoneOptions) { %>
+          <option value="<%= z %>" <%= filters.zone === z ? 'selected' : '' %>><%= z %></option>
+        <% } %>
+      </select>
+    </div>
+    <div>
+      <label class="field__label">Account</label>
+      <select name="account" class="field__select">
+        <option value="">All accounts</option>
+        <% for (const a of accountOptions) { %>
+          <option value="<%= a %>" <%= filters.account === a ? 'selected' : '' %>><%= a %></option>
+        <% } %>
+      </select>
+    </div>
+    <div>
+      <label class="field__label">Prayer</label>
+      <select name="prayer" class="field__select">
+        <option value="">All prayers</option>
+        <% for (const p of prayerOptions) { %>
+          <option value="<%= p %>" <%= filters.prayer === p ? 'selected' : '' %>><%= p %></option>
+        <% } %>
+      </select>
+    </div>
+    <div>
+      <label class="field__label">From (UTC date)</label>
+      <input type="date" name="start" class="field__input" value="<%= filters.start %>">
+    </div>
+    <div>
+      <label class="field__label">To (UTC date, inclusive)</label>
+      <input type="date" name="end" class="field__input" value="<%= filters.end %>">
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+      <button type="submit" class="btn btn--primary">Filter</button>
+      <a href="/log" class="btn btn--ghost">Clear</a>
+    </div>
+  </form>
+</div>
+
 <% if (logs.length === 0) { %>
   <div class="card">
     <div class="empty-state">
       <div class="empty-state__icon">&#128196;</div>
-      <div class="empty-state__title">No activity yet</div>
-      <div class="empty-state__body">Actions will appear here once the scheduler runs. Configure a zone and wait for the next prayer time.</div>
-      <a href="/" class="btn btn--primary">Go to Dashboard</a>
+      <div class="empty-state__title">No activity</div>
+      <div class="empty-state__body">No log entries match these filters. Try clearing them or widening the date range.</div>
+      <a href="/log" class="btn btn--primary">Clear filters</a>
     </div>
   </div>
 <% } else { %>
+  <div class="text-muted" style="margin-bottom: 0.5rem; font-size: var(--font-size-xs);">Showing <%= logs.length %> entries (most recent first, capped at 500).</div>
   <div class="data-table--wrapper">
     <table class="data-table">
       <thead>

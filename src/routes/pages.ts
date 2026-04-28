@@ -223,16 +223,69 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
 
 // ── Activity Log ──────────────────────────────────────────────────────────
 
-router.get("/log", async (_req: Request, res: Response) => {
+router.get("/log", async (req: Request, res: Response) => {
   try {
+    const filters = {
+      zone: typeof req.query.zone === "string" ? req.query.zone.trim() : "",
+      account: typeof req.query.account === "string" ? req.query.account.trim() : "",
+      prayer: typeof req.query.prayer === "string" ? req.query.prayer.trim() : "",
+      start: typeof req.query.start === "string" ? req.query.start.trim() : "",
+      end: typeof req.query.end === "string" ? req.query.end.trim() : "",
+    };
+
+    const where: string[] = [];
+    const params: unknown[] = [];
+    let p = 1;
+
+    if (filters.zone) {
+      where.push(`zc.zone_name ILIKE $${p++}`);
+      params.push(`%${filters.zone}%`);
+    }
+    if (filters.account) {
+      where.push(`zc.account_name ILIKE $${p++}`);
+      params.push(`%${filters.account}%`);
+    }
+    if (filters.prayer) {
+      where.push(`al.prayer = $${p++}`);
+      params.push(filters.prayer);
+    }
+    if (filters.start) {
+      where.push(`al.executed_at >= $${p++}`);
+      params.push(filters.start);
+    }
+    if (filters.end) {
+      where.push(`al.executed_at < ($${p++}::timestamp + INTERVAL '1 day')`);
+      params.push(filters.end);
+    }
+
+    const whereClause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+
     const result = await query(
       `SELECT al.*, zc.zone_name, zc.account_name, zc.timezone AS zone_timezone
        FROM action_log al
        JOIN zone_configs zc ON zc.id = al.zone_config_id
+       ${whereClause}
        ORDER BY al.created_at DESC
-       LIMIT 100`
+       LIMIT 500`,
+      params
     );
-    res.render("log", { logs: result.rows, currentPage: "log" });
+
+    // Distinct values for dropdowns
+    const accounts = await query<{ account_name: string }>(
+      `SELECT DISTINCT account_name FROM zone_configs ORDER BY account_name`
+    );
+    const zones = await query<{ zone_name: string }>(
+      `SELECT DISTINCT zone_name FROM zone_configs ORDER BY zone_name`
+    );
+
+    res.render("log", {
+      logs: result.rows,
+      filters,
+      accountOptions: accounts.rows.map((r) => r.account_name),
+      zoneOptions: zones.rows.map((r) => r.zone_name),
+      prayerOptions: ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"],
+      currentPage: "log",
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     res.status(500).send(`Error: ${msg}`);
