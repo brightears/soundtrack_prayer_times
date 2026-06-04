@@ -75,6 +75,20 @@
     </div>
 
     <div class="field">
+      <label class="field__label">Coordinates (for accurate prayer times)</label>
+      <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
+        <input type="number" step="any" name="latitude" id="latitude" class="field__input"
+          value="<%= zone && zone.latitude != null ? zone.latitude : '' %>" placeholder="latitude" style="width: 10rem;">
+        <input type="number" step="any" name="longitude" id="longitude" class="field__input"
+          value="<%= zone && zone.longitude != null ? zone.longitude : '' %>" placeholder="longitude" style="width: 10rem;">
+        <button type="button" class="btn btn--secondary" id="geocode-btn">Look up from city</button>
+      </div>
+      <p class="text-muted" id="geocode-hint" style="margin-top: var(--space-1); font-size: 0.8rem;">
+        Recommended. When set, prayer times are calculated from these exact coordinates instead of the city name (which some locations geocode incorrectly).
+      </p>
+    </div>
+
+    <div class="field">
       <label class="field__label field__label--required">Timezone</label>
       <select name="timezone" class="field__select" required>
         <option value="">Select timezone</option>
@@ -360,6 +374,34 @@
       });
     }
   <% } %>
+
+  // Coordinate lookup from city / country (OpenStreetMap)
+  const geocodeBtn = document.getElementById('geocode-btn');
+  if (geocodeBtn) {
+    geocodeBtn.addEventListener('click', () => {
+      const city = (document.querySelector('input[name="city"]').value || '').trim();
+      const country = (document.querySelector('input[name="country"]').value || '').trim();
+      const hint = document.getElementById('geocode-hint');
+      if (!city) { hint.textContent = 'Enter a city first.'; return; }
+      geocodeBtn.classList.add('btn--loading');
+      geocodeBtn.disabled = true;
+      const qs = new URLSearchParams({ city: city, country: country }).toString();
+      fetch('/api/geocode?' + qs)
+        .then(r => r.json().then(body => (r.ok ? body : Promise.reject(body))))
+        .then(res => {
+          document.getElementById('latitude').value = res.latitude;
+          document.getElementById('longitude').value = res.longitude;
+          hint.textContent = 'Found: ' + res.displayName + '  (' + Number(res.latitude).toFixed(4) + ', ' + Number(res.longitude).toFixed(4) + ')';
+        })
+        .catch(err => {
+          hint.textContent = 'Lookup failed: ' + ((err && err.error) ? err.error : 'try again or enter coordinates manually.');
+        })
+        .finally(() => {
+          geocodeBtn.classList.remove('btn--loading');
+          geocodeBtn.disabled = false;
+        });
+    });
+  }
 
   // Delete button
   const deleteBtn = document.getElementById('delete-btn');

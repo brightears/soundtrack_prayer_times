@@ -127,6 +127,9 @@ export interface FetchTimingsParams {
   school: number; // 0=Shafi'i, 1=Hanafi
   date?: Date;
   source?: string; // prayer time provider (default: aladhan)
+  latitude?: number | null; // when set, calculate from exact coordinates
+  longitude?: number | null;
+  timezone?: string; // IANA tz, pinned on Aladhan's output when using coordinates
 }
 
 export async function fetchTimings(
@@ -151,9 +154,29 @@ async function fetchFromAladhan(
   const date = params.date ?? new Date();
   const dateStr = `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
 
-  const url = new URL(`${ALADHAN_BASE_URL}/timingsByCity/${dateStr}`);
-  url.searchParams.set("city", params.city);
-  url.searchParams.set("country", params.country);
+  // Prefer exact coordinates when available. Aladhan's city-name geocoder
+  // silently resolves some towns to the wrong location (e.g. "Umluj, Saudi
+  // Arabia" → a point ~31 min of solar time east), so coordinates are the
+  // accurate, deterministic path. Falls back to city/country lookup otherwise.
+  const hasCoords =
+    typeof params.latitude === "number" &&
+    Number.isFinite(params.latitude) &&
+    typeof params.longitude === "number" &&
+    Number.isFinite(params.longitude);
+
+  let url: URL;
+  if (hasCoords) {
+    url = new URL(`${ALADHAN_BASE_URL}/timings/${dateStr}`);
+    url.searchParams.set("latitude", String(params.latitude));
+    url.searchParams.set("longitude", String(params.longitude));
+    // Pin the output timezone to the zone's stored tz so the returned HH:MM
+    // matches how the scheduler converts it back to UTC.
+    if (params.timezone) url.searchParams.set("timezonestring", params.timezone);
+  } else {
+    url = new URL(`${ALADHAN_BASE_URL}/timingsByCity/${dateStr}`);
+    url.searchParams.set("city", params.city);
+    url.searchParams.set("country", params.country);
+  }
   url.searchParams.set("method", String(params.method));
   url.searchParams.set("school", String(params.school));
 

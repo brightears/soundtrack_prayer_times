@@ -11,6 +11,8 @@ interface ZoneConfig {
   zone_name: string;
   city: string;
   country: string;
+  latitude: number | null;
+  longitude: number | null;
   timezone: string;
   method: number;
   asr_school: number;
@@ -164,6 +166,9 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
     const fetched = await fetchTimings({
       city: config.city,
       country: config.country,
+      latitude: config.latitude,
+      longitude: config.longitude,
+      timezone: config.timezone,
       method: config.method,
       school: config.asr_school,
       source: config.prayer_source,

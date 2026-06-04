@@ -9,6 +9,7 @@ import {
   ACCOUNT_LIBRARY,
 } from "../queries.js";
 import { refreshZone, refreshAllSchedules, testZone } from "../scheduler.js";
+import { geocodeCity } from "../geocode.js";
 
 const router = Router();
 
@@ -207,6 +208,26 @@ router.delete(
       return;
     }
     res.json({ deleted: true });
+  })
+);
+
+// ── Geocode (city/country → coordinates) ─────────────────────────────────
+
+router.get(
+  "/geocode",
+  wrap(async (req, res) => {
+    const city = ((req.query.city as string) || "").trim();
+    const country = ((req.query.country as string) || "").trim();
+    if (!city) {
+      res.status(400).json({ error: "city is required" });
+      return;
+    }
+    const result = await geocodeCity(city, country);
+    if (!result) {
+      res.status(404).json({ error: "No coordinates found for that city/country" });
+      return;
+    }
+    res.json(result);
   })
 );
 

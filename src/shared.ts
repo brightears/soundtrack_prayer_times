@@ -36,3 +36,10 @@ export function collectDurations(body: Record<string, string>): Record<string, n
   }
   return durations;
 }
+
+// Parse a latitude/longitude form value into a number, or null when blank/invalid.
+export function parseCoord(raw: unknown): number | null {
+  if (raw === undefined || raw === null || raw === "") return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : null;
+}

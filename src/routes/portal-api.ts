@@ -4,6 +4,7 @@ import { graphql, extractNodes } from "../soundtrack.js";
 import { LOCATION_SOUND_ZONES, ACCOUNT_LIBRARY } from "../queries.js";
 import { testZone, refreshZone } from "../scheduler.js";
 import { portalAuth } from "../middleware/portal-auth.js";
+import { geocodeCity } from "../geocode.js";
 
 const router = Router();
 
@@ -83,6 +84,26 @@ router.post(
       await refreshZone(zone.id);
     }
     res.json({ refreshed: true, count: zones.rows.length });
+  })
+);
+
+// ── Geocode (city/country → coordinates) ─────────────────────────────────
+
+router.get(
+  "/:token/api/geocode",
+  wrap(async (req, res) => {
+    const city = ((req.query.city as string) || "").trim();
+    const country = ((req.query.country as string) || "").trim();
+    if (!city) {
+      res.status(400).json({ error: "city is required" });
+      return;
+    }
+    const result = await geocodeCity(city, country);
+    if (!result) {
+      res.status(404).json({ error: "No coordinates found for that city/country" });
+      return;
+    }
+    res.json(result);
   })
 );
 
