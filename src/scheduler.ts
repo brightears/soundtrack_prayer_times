@@ -48,20 +48,56 @@ const SKIPPED_PAST_MSG =
 // Track the midnight cron task
 let midnightTask: cron.ScheduledTask | null = null;
 
-function parseTime(timeStr: string, timezone: string, date?: Date): Date {
+// Returns `timezone`'s UTC offset in milliseconds at `instant` (positive = east of
+// UTC). Server-TZ-independent: it formats the instant's wall-clock fields in the
+// target zone, reinterprets those fields as if they were UTC, and subtracts the
+// original instant — all absolute epoch math, so the host's local TZ never enters.
+function zoneOffsetMs(timezone: string, instant: Date): number {
+  const parts: Record<string, string> = {};
+  for (const p of new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(instant)) {
+    parts[p.type] = p.value;
+  }
+  const asIfUTC = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second)
+  );
+  return asIfUTC - instant.getTime();
+}
+
+// Converts a "HH:MM" wall-clock prayer time in `timezone` to the corresponding UTC
+// instant, on the zone's local calendar date at `date` (default: now).
+//
+// Independent of the server process's local timezone: it composes the wall-clock
+// fields with Date.UTC (absolute) and backs out the zone's offset for that date via
+// zoneOffsetMs. The previous implementation parsed a suffix-less datetime string,
+// which JS interprets in the *server's* local TZ — correct only on a UTC host, so
+// the firing instant drifted by the host offset on any non-UTC machine. Output is
+// unchanged on a UTC host (Render). See "parseTime UTC dependency" in the gotchas.
+export function parseTime(timeStr: string, timezone: string, date?: Date): Date {
   const now = date ?? new Date();
   const [hours, minutes] = timeStr.split(":").map(Number);
 
-  // Create a date string in the zone's local date
-  const localDateStr = now.toLocaleDateString("en-CA", { timeZone: timezone }); // YYYY-MM-DD
-  const localDateTime = new Date(`${localDateStr}T${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:00`);
+  // Zone-local calendar date (YYYY-MM-DD) for the target instant — itself TZ-safe.
+  const localDateStr = now.toLocaleDateString("en-CA", { timeZone: timezone });
+  const [year, month, day] = localDateStr.split("-").map(Number);
 
-  // Convert from zone-local to UTC by computing the offset
-  const utcStr = now.toLocaleString("en-US", { timeZone: "UTC" });
-  const tzStr = now.toLocaleString("en-US", { timeZone: timezone });
-  const offsetMs = new Date(utcStr).getTime() - new Date(tzStr).getTime();
-
-  return new Date(localDateTime.getTime() + offsetMs);
+  // Treat the wall-clock fields as UTC, then subtract the zone's offset for that
+  // date (probed at the wall instant so DST is resolved for the day in question).
+  const wallAsUTC = Date.UTC(year, month - 1, day, hours, minutes, 0);
+  return new Date(wallAsUTC - zoneOffsetMs(timezone, new Date(wallAsUTC)));
 }
 
 function nowInTimezone(timezone: string): Date {
