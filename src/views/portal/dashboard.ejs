@@ -30,6 +30,7 @@
           <th>Location</th>
           <th>Prayers</th>
           <th>Duration</th>
+          <th title="Prayer times the app calculated for today, in your zone's local time">Today's Times</th>
           <th>Mode</th>
           <th>Status</th>
           <th></th>
@@ -57,6 +58,21 @@
                 <% } %>
               <% } %>
             </div>
+          </td>
+          <td>
+            <% const tt = z.today_prayer_times; %>
+            <% if (tt) { %>
+              <% const activeSet = new Set(z.prayers.split(',').map(p => p.trim())); %>
+              <div class="prayer-pills">
+                <% for (const p of ['Fajr','Dhuhr','Asr','Maghrib','Isha']) { %>
+                  <% if (tt[p]) { %>
+                    <span class="prayer-pill<%= activeSet.has(p) ? ' prayer-pill--active' : '' %>"><%= p %> <%= tt[p] %></span>
+                  <% } %>
+                <% } %>
+              </div>
+            <% } else { %>
+              <span class="text-muted" style="font-size: var(--font-size-xs);" title="No prayer times calculated for today yet">&mdash;</span>
+            <% } %>
           </td>
           <td>
             <%= z.mode %>

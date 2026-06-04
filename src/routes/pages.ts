@@ -4,6 +4,7 @@ import { query } from "../db.js";
 import { CALCULATION_METHODS, PRAYER_SOURCES } from "../aladhan.js";
 import { getSchedulerStatus, refreshZone } from "../scheduler.js";
 import { collectPrayers, collectDurations } from "../shared.js";
+import { attachTodayTimings, type DashboardZoneRow } from "../today-times.js";
 
 const router = Router();
 
@@ -11,7 +12,7 @@ const router = Router();
 
 router.get("/", async (_req: Request, res: Response) => {
   try {
-    const zones = await query(
+    const result = await query<DashboardZoneRow>(
       `SELECT zc.*,
         (SELECT row_to_json(al.*) FROM action_log al
          WHERE al.zone_config_id = zc.id
@@ -19,11 +20,13 @@ router.get("/", async (_req: Request, res: Response) => {
        FROM zone_configs zc
        ORDER BY zc.created_at DESC`
     );
+    const zones = result.rows;
+    await attachTodayTimings(zones);
 
     const status = getSchedulerStatus();
 
     res.render("dashboard", {
-      zones: zones.rows,
+      zones,
       schedulerStatus: status,
       currentPage: "dashboard",
     });

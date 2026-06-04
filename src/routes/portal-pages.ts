@@ -4,6 +4,7 @@ import { CALCULATION_METHODS, PRAYER_SOURCES } from "../aladhan.js";
 import { refreshZone } from "../scheduler.js";
 import { portalAuth } from "../middleware/portal-auth.js";
 import { collectPrayers, collectDurations } from "../shared.js";
+import { attachTodayTimings, type DashboardZoneRow } from "../today-times.js";
 
 const router = Router();
 
@@ -15,7 +16,7 @@ router.use("/:token", portalAuth);
 router.get("/:token", async (req: Request, res: Response) => {
   try {
     const customer = req.customer!;
-    const zones = await query(
+    const result = await query<DashboardZoneRow>(
       `SELECT zc.*,
         (SELECT row_to_json(al.*) FROM action_log al
          WHERE al.zone_config_id = zc.id
@@ -25,9 +26,11 @@ router.get("/:token", async (req: Request, res: Response) => {
        ORDER BY zc.created_at DESC`,
       [customer.account_id]
     );
+    const zones = result.rows;
+    await attachTodayTimings(zones);
 
     res.render("portal/dashboard", {
-      zones: zones.rows,
+      zones,
       customer,
       basePath: `/p/${customer.token}`,
       currentPage: "dashboard",
