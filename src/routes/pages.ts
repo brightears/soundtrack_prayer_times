@@ -3,7 +3,7 @@ import { randomBytes } from "crypto";
 import { query } from "../db.js";
 import { CALCULATION_METHODS, PRAYER_SOURCES } from "../aladhan.js";
 import { getSchedulerStatus, refreshZone } from "../scheduler.js";
-import { collectPrayers, collectDurations, parseCoord } from "../shared.js";
+import { collectPrayers, collectDurations, collectAdhanPrayers, parseCoord } from "../shared.js";
 import { attachTodayTimings, type DashboardZoneRow } from "../today-times.js";
 
 const router = Router();
@@ -90,14 +90,15 @@ router.post("/zones/create", async (req: Request, res: Response) => {
     }
 
     const durations = collectDurations(b);
+    const adhanPrayers = collectAdhanPrayers(b);
     const result = await query(
       `INSERT INTO zone_configs
        (account_id, account_name, location_id, location_name, zone_id, zone_name,
         city, country, latitude, longitude, timezone, method, asr_school,
         prayers, pause_offset_minutes, pause_durations, mode, enabled,
         adhan_enabled, adhan_source_id, adhan_lead_minutes, default_source_id,
-        prayer_source)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+        prayer_source, adhan_prayers)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
        RETURNING *`,
       [
         b.account_id,
@@ -123,6 +124,7 @@ router.post("/zones/create", async (req: Request, res: Response) => {
         Number(b.adhan_lead_minutes) || 5,
         b.default_source_id || null,
         b.prayer_source || "aladhan",
+        adhanPrayers,
       ]
     );
 
@@ -165,6 +167,7 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
     }
 
     const durations = collectDurations(b);
+    const adhanPrayers = collectAdhanPrayers(b);
     const result = await query(
       `UPDATE zone_configs SET
         account_id = $1, account_name = $2,
@@ -176,9 +179,9 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
         mode = $17, enabled = $18,
         adhan_enabled = $19, adhan_source_id = $20,
         adhan_lead_minutes = $21, default_source_id = $22,
-        prayer_source = $23,
+        prayer_source = $23, adhan_prayers = $24,
         updated_at = NOW()
-       WHERE id = $24 RETURNING *`,
+       WHERE id = $25 RETURNING *`,
       [
         b.account_id,
         b.account_name,
@@ -203,6 +206,7 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
         Number(b.adhan_lead_minutes) || 5,
         b.default_source_id || null,
         b.prayer_source || "aladhan",
+        adhanPrayers,
         req.params.id,
       ]
     );

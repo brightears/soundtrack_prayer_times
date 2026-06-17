@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import { query } from "./db.js";
 import { graphql } from "./soundtrack.js";
-import { PLAY, PAUSE, ASSIGN_SOURCE } from "./queries.js";
+import { PLAY, PAUSE, ASSIGN_SOURCE, ZONE_PLAY_FROM } from "./queries.js";
 import { fetchTimings, type PrayerName, PRAYER_NAMES } from "./aladhan.js";
 import { clampPauseDuration, MAX_PAUSE_MINUTES } from "./shared.js";
 
@@ -26,6 +26,7 @@ interface ZoneConfig {
   adhan_source_id: string | null;
   adhan_lead_minutes: number;
   default_source_id: string | null;
+  adhan_prayers: string;
 }
 
 interface PrayerTimingsCache {
@@ -173,6 +174,33 @@ async function executeWithRetry(
   throw lastError;
 }
 
+// Reads the zone's natural source id (Playlist/Schedule/Soundtrack). Retries like
+// the mutations so a transient failure doesn't silently fall back to a fixed source
+// and clobber a daypart Schedule. Returns null only when playFrom is genuinely null
+// or every retry fails.
+async function readNaturalSourceId(
+  zoneId: string,
+  retries: number = 3
+): Promise<string | null> {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const res = await graphql<{
+        soundZone: { playFrom: { id?: string } | null } | null;
+      }>(ZONE_PLAY_FROM, { zoneId });
+      return res.data?.soundZone?.playFrom?.id ?? null;
+    } catch (err) {
+      if (attempt < retries - 1) {
+        await new Promise((r) => setTimeout(r, 5000));
+      } else {
+        console.warn(
+          `Could not read natural source for zone ${zoneId} after ${retries} attempts; restore will fall back to default_source_id: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+  }
+  return null;
+}
+
 function clearTimeouts(configId: number): void {
   const timeouts = activeTimeouts.get(configId);
   if (timeouts) {
@@ -182,6 +210,10 @@ function clearTimeouts(configId: number): void {
 }
 
 async function scheduleZone(config: ZoneConfig): Promise<void> {
+  // Known limitation: a refresh during an active adhan/pause window clears the
+  // pending restore timeout below, which can leave the zone on the adhan playlist
+  // with no same-day resume until the next daily refresh. Catch-up re-arming of an
+  // in-flight restore is a deferred follow-up (see prayer-times gotchas).
   clearTimeouts(config.id);
 
   const now = new Date();
@@ -250,7 +282,36 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
   const enabledPrayers = config.prayers.split(",").map((p) => p.trim()) as PrayerName[];
   const timeouts: NodeJS.Timeout[] = [];
 
-  const useAdhan = config.adhan_enabled && config.adhan_source_id && config.default_source_id;
+  // Adhan is "capable" when it's enabled and both sources are configured. Whether
+  // it actually fires for a given prayer is gated per-prayer below via adhanPrayers.
+  const adhanCapable = Boolean(
+    config.adhan_enabled && config.adhan_source_id && config.default_source_id
+  );
+  const adhanPrayers = new Set(
+    (config.adhan_prayers ?? "").split(",").map((p) => p.trim()).filter(Boolean)
+  );
+
+  // Surface a silent misconfig: adhan toggled on but a source missing, so it would
+  // quietly run standard pause/resume. Make it visible in the Activity Log.
+  if (config.adhan_enabled && (!config.adhan_source_id || !config.default_source_id)) {
+    await logAction(
+      config.id,
+      config.zone_id,
+      "adhan",
+      "config",
+      new Date(),
+      false,
+      "Adhan enabled but adhan_source_id or default_source_id not set; using standard pause/resume"
+    );
+  }
+
+  // Per-prayer captured natural source, set just before each adhan assign and read
+  // by that prayer's restore timeout. Scoped to this scheduleZone() invocation —
+  // in-memory only, so a process restart or a refresh that lands AFTER the adhan
+  // assign but BEFORE the restore loses the capture; that restore then falls back
+  // to default_source_id, which for a schedule-driven zone won't match its daypart
+  // Schedule. Persisting the capture to survive restarts is a deferred follow-up.
+  const naturalSourceByPrayer = new Map<string, string | null>();
 
   for (const prayer of enabledPrayers) {
     if (!PRAYER_NAMES.includes(prayer)) continue;
@@ -278,6 +339,9 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
 
     const nowMs = now.getTime();
 
+    // Per-prayer adhan gate: only the prayers the user selected get the adhan flow.
+    const useAdhan = adhanCapable && adhanPrayers.has(prayer);
+
     if (useAdhan) {
       // --- Adhan flow: assign adhan → pause → restore default source ---
       const adhanTime = new Date(
@@ -292,10 +356,18 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
             console.log(
               `Playing adhan on zone ${config.zone_name} for ${prayer} prayer`
             );
+            // Capture the zone's real source NOW, before we overwrite it with the
+            // adhan, so the restore can put back exactly what was playing.
+            const captured = await readNaturalSourceId(config.zone_id);
+            naturalSourceByPrayer.set(
+              prayer,
+              captured ?? config.default_source_id ?? null
+            );
             await executeWithRetry(ASSIGN_SOURCE, {
               zoneId: config.zone_id,
               sourceId: config.adhan_source_id!,
             });
+            await executeWithRetry(PLAY, { soundZone: config.zone_id });
             await logAction(config.id, config.zone_id, "adhan", prayer, adhanTime, true);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -332,11 +404,18 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
         const delayMs = resumeTime.getTime() - nowMs;
         const timeout = setTimeout(async () => {
           try {
-            console.log(`Restoring default music on zone ${config.zone_name} after ${prayer} prayer`);
-            await executeWithRetry(ASSIGN_SOURCE, {
-              zoneId: config.zone_id,
-              sourceId: config.default_source_id!,
-            });
+            console.log(`Restoring music on zone ${config.zone_name} after ${prayer} prayer`);
+            const restoreId =
+              naturalSourceByPrayer.get(prayer) ?? config.default_source_id ?? null;
+            // Never send source:null (the schema's source is ID!). With nothing to
+            // restore, skip the assign and just resume whatever the zone is on.
+            if (restoreId) {
+              await executeWithRetry(ASSIGN_SOURCE, {
+                zoneId: config.zone_id,
+                sourceId: restoreId,
+              });
+            }
+            await executeWithRetry(PLAY, { soundZone: config.zone_id });
             await logAction(config.id, config.zone_id, "restore", prayer, resumeTime, true);
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);

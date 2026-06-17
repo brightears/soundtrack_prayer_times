@@ -25,6 +25,13 @@ export function collectPrayers(body: Record<string, string>): string {
   return prayers.filter((p) => body[`prayer_${p}`]).join(",");
 }
 
+// Which prayers the call-to-prayer (adhan) plays for. Distinct `adhan_prayer_`
+// prefix so it doesn't collide with the pause checkboxes (`prayer_`) above.
+export function collectAdhanPrayers(body: Record<string, string>): string {
+  const prayers = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"];
+  return prayers.filter((p) => body[`adhan_prayer_${p}`]).join(",");
+}
+
 export function collectDurations(body: Record<string, string>): Record<string, number> {
   const durations: Record<string, number> = {};
   for (const prayer of ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"]) {

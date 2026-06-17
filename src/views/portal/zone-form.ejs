@@ -136,7 +136,8 @@
     <% const allPrayers = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
        const enabledPrayers = zone ? zone.prayers.split(',').map(p => p.trim()) : allPrayers;
        const defaultDurations = { Fajr: 15, Dhuhr: 20, Asr: 15, Maghrib: 15, Isha: 20 };
-       const durations = zone && zone.pause_durations ? zone.pause_durations : defaultDurations; %>
+       const durations = zone && zone.pause_durations ? zone.pause_durations : defaultDurations;
+       const adhanPrayers = (zone && zone.adhan_prayers != null) ? zone.adhan_prayers.split(',').map(p => p.trim()).filter(Boolean) : allPrayers; %>
 
     <div class="data-table--wrapper" style="margin-bottom: var(--space-6);">
       <table class="data-table">
@@ -145,6 +146,7 @@
             <th>Prayer</th>
             <th>Enabled</th>
             <th>Duration (min)</th>
+            <th id="adhan-col-head">Call to Prayer</th>
           </tr>
         </thead>
         <tbody>
@@ -162,6 +164,13 @@
                 min="5" max="60"
                 value="<%= durations[prayer] || defaultDurations[prayer] %>"
                 style="width: 5rem;">
+            </td>
+            <td>
+              <label class="field__check">
+                <input type="checkbox" name="adhan_prayer_<%= prayer %>" value="1"
+                  class="adhan-prayer-check"
+                  <%= adhanPrayers.includes(prayer) ? 'checked' : '' %>>
+              </label>
             </td>
           </tr>
           <% } %>
@@ -282,15 +291,30 @@
     loadLibrary();
   });
 
-  // Adhan toggle
+  // Adhan toggle — dims the source block AND enables/disables the per-prayer
+  // "Call to Prayer" checkboxes, and runs once on load (not just on change).
   const adhanEnabled = document.getElementById('adhan-enabled');
   const adhanFields = document.getElementById('adhan-fields');
-  if (adhanEnabled && adhanFields) {
-    adhanEnabled.addEventListener('change', () => {
-      const on = adhanEnabled.value === 'true';
+  const adhanColHead = document.getElementById('adhan-col-head');
+  const adhanChecks = document.querySelectorAll('.adhan-prayer-check');
+  function syncAdhan() {
+    const on = adhanEnabled.value === 'true';
+    if (adhanFields) {
       adhanFields.style.opacity = on ? '1' : '0.4';
       adhanFields.style.pointerEvents = on ? 'auto' : 'none';
+    }
+    // Dim (don't disable) the per-prayer checkboxes when adhan is off: disabled
+    // inputs aren't submitted, so an unrelated save would wipe a curated selection.
+    // pointer-events:none keeps them read-only while still submittable.
+    adhanChecks.forEach((c) => {
+      c.style.opacity = on ? '1' : '0.4';
+      c.style.pointerEvents = on ? 'auto' : 'none';
     });
+    if (adhanColHead) adhanColHead.style.opacity = on ? '1' : '0.4';
+  }
+  if (adhanEnabled) {
+    adhanEnabled.addEventListener('change', syncAdhan);
+    syncAdhan();
   }
 
   // Library loader for adhan/default source dropdowns

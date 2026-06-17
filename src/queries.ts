@@ -75,11 +75,28 @@ mutation Pause($soundZone: ID!) {
   }
 }`;
 
-// Mutation for assigning a playlist/schedule to a sound zone
+// Mutation for assigning a playlist/schedule to a sound zone.
+// immediate:true makes the swap take over the live stream NOW; without it the API
+// waits for the current track to finish (so the adhan would start late / not at all).
 export const ASSIGN_SOURCE = `
 mutation AssignSource($zoneId: ID!, $sourceId: ID!) {
-  soundZoneAssignSource(input: { soundZones: [$zoneId], source: $sourceId }) {
+  soundZoneAssignSource(input: { soundZones: [$zoneId], source: $sourceId, immediate: true }) {
     soundZones
+  }
+}`;
+
+// Read a zone's currently-assigned source (Playlist | Schedule | Soundtrack) so we
+// can restore EXACTLY that after an adhan prayer. Restoring a fixed playlist would
+// break daypart automation on schedule-driven zones.
+export const ZONE_PLAY_FROM = `
+query ZonePlayFrom($zoneId: ID!) {
+  soundZone(id: $zoneId) {
+    playFrom {
+      __typename
+      ... on Playlist { id }
+      ... on Schedule { id }
+      ... on Soundtrack { id }
+    }
   }
 }`;
 
