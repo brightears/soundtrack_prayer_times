@@ -164,9 +164,11 @@ router.get(
     }>(ACCOUNT_LIBRARY, { accountId: customer.account_id });
 
     const library = result.data!.account.musicLibrary;
+    const byName = (a: { name: string }, b: { name: string }) =>
+      a.name.localeCompare(b.name);
     res.json({
-      playlists: extractNodes(library.playlists),
-      schedules: extractNodes(library.schedules),
+      playlists: extractNodes(library.playlists).sort(byName),
+      schedules: extractNodes(library.schedules).sort(byName),
     });
   })
 );

@@ -231,6 +231,12 @@
         <select name="adhan_source_id" id="adhan-source" class="field__select">
           <option value="">Select playlist...</option>
         </select>
+        <input type="text" name="adhan_source_id" id="adhan-source-id" class="field__input"
+          placeholder="Paste a playlist or schedule ID" style="display: none; margin-top: var(--space-2);" disabled>
+        <label class="field__check" style="margin-top: var(--space-2);">
+          <input type="checkbox" id="adhan-source-toggle">
+          <span class="text-muted" style="font-size: 0.8rem;">Enter ID manually</span>
+        </label>
       </div>
 
       <div class="field">
@@ -238,6 +244,12 @@
         <select name="default_source_id" id="default-source" class="field__select">
           <option value="">Select playlist or schedule...</option>
         </select>
+        <input type="text" name="default_source_id" id="default-source-id" class="field__input"
+          placeholder="Paste a playlist or schedule ID" style="display: none; margin-top: var(--space-2);" disabled>
+        <label class="field__check" style="margin-top: var(--space-2);">
+          <input type="checkbox" id="default-source-toggle">
+          <span class="text-muted" style="font-size: 0.8rem;">Enter ID manually</span>
+        </label>
         <p class="text-muted" style="margin-top: var(--space-1); font-size: 0.8rem;">
           The playlist or schedule to restore after prayer ends.
         </p>
@@ -355,6 +367,34 @@
     syncAdhan();
   }
 
+  // Source-ID entry: lets each source field be typed as a raw ID instead of picked
+  // from the list. The select + text input share a name; the inactive one is disabled
+  // so exactly one value submits.
+  function setupIdEntry(selectId, inputId, toggleId) {
+    const sel = document.getElementById(selectId);
+    const inp = document.getElementById(inputId);
+    const tog = document.getElementById(toggleId);
+    if (!sel || !inp || !tog) return null;
+    function apply() {
+      const idMode = tog.checked;
+      sel.style.display = idMode ? 'none' : '';
+      sel.disabled = idMode;
+      inp.style.display = idMode ? 'block' : 'none';
+      inp.disabled = !idMode;
+    }
+    tog.addEventListener('change', apply);
+    apply();
+    return function switchToIdIfMissing(savedVal) {
+      if (savedVal && ![...sel.options].some((o) => o.value === savedVal)) {
+        inp.value = savedVal;
+        tog.checked = true;
+        apply();
+      }
+    };
+  }
+  const adhanIdFallback = setupIdEntry('adhan-source', 'adhan-source-id', 'adhan-source-toggle');
+  const defaultIdFallback = setupIdEntry('default-source', 'default-source-id', 'default-source-toggle');
+
   // Library loader for adhan/default source dropdowns
   function loadLibrary(accountId) {
     if (!accountId) return;
@@ -383,6 +423,11 @@
               '<option value="' + s.id + '"' + (s.id === savedDefault ? ' selected' : '') + '>' + s.name + ' (' + s.type + ')</option>'
             ).join('');
         }
+
+        // If a saved value isn't in the list (an ID typed manually, or a deleted
+        // playlist), switch that field to manual-ID mode showing the value.
+        if (adhanIdFallback) adhanIdFallback(savedAdhan);
+        if (defaultIdFallback) defaultIdFallback(savedDefault);
       })
       .catch(() => {});
   }

@@ -331,7 +331,9 @@ router.get(
       : accounts;
 
     res.json(
-      filtered.map((a) => ({ id: a.id, name: a.businessName.trim() }))
+      filtered
+        .map((a) => ({ id: a.id, name: a.businessName.trim() }))
+        .sort((a, b) => a.name.localeCompare(b.name))
     );
   })
 );
@@ -405,9 +407,11 @@ router.get(
     }>(ACCOUNT_LIBRARY, { accountId: req.params.accountId as string });
 
     const library = result.data!.account.musicLibrary;
+    const byName = (a: { name: string }, b: { name: string }) =>
+      a.name.localeCompare(b.name);
     res.json({
-      playlists: extractNodes(library.playlists),
-      schedules: extractNodes(library.schedules),
+      playlists: extractNodes(library.playlists).sort(byName),
+      schedules: extractNodes(library.schedules).sort(byName),
     });
   })
 );

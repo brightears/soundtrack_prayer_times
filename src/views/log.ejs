@@ -4,7 +4,7 @@
   <div class="page-header__top">
     <div>
       <h1 class="page-header__title">Activity Log</h1>
-      <p class="page-header__subtitle">Recent pause and resume actions across all zones</p>
+      <p class="page-header__subtitle">Recent pause, resume, and call-to-prayer actions across all zones</p>
     </div>
     <div class="page-header__actions">
       <a href="/" class="btn btn--ghost">Back to Dashboard</a>
@@ -66,6 +66,7 @@
     </div>
   </div>
 <% } else { %>
+  <% const ACTION_LABELS = { adhan: 'Call to Prayer', restore: 'Restore music', pause: 'Pause', resume: 'Resume', 'test-pause': 'Test pause', 'test-resume': 'Test resume' }; %>
   <div class="text-muted" style="margin-bottom: 0.5rem; font-size: var(--font-size-xs);">Showing <%= logs.length %> entries (most recent first, capped at 500).</div>
   <div class="data-table--wrapper">
     <table class="data-table">
@@ -89,7 +90,8 @@
           <td class="text-bold"><%= log.zone_name %></td>
           <td><%= log.account_name %></td>
           <td>
-            <span class="prayer-pill"><%= log.action %></span>
+            <% const isAdhan = log.action === 'adhan' || log.action === 'restore'; %>
+            <span class="prayer-pill<%= isAdhan ? ' prayer-pill--active' : '' %>"><%= ACTION_LABELS[log.action] || log.action %></span>
           </td>
           <td><%= log.prayer %></td>
           <td>
