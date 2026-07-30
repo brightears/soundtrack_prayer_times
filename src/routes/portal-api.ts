@@ -98,9 +98,19 @@ router.get(
       res.status(400).json({ error: "city is required" });
       return;
     }
-    const result = await geocodeCity(city, country);
+    let result;
+    try {
+      result = await geocodeCity(city, country);
+    } catch (err) {
+      res.status(503).json({
+        error: `Lookup service temporarily unavailable — try again, or type the coordinates in. (${err instanceof Error ? err.message : String(err)})`,
+      });
+      return;
+    }
     if (!result) {
-      res.status(404).json({ error: "No coordinates found for that city/country" });
+      res.status(404).json({
+        error: `No match for "${city}${country ? ", " + country : ""}". Check the spelling, or type the coordinates in.`,
+      });
       return;
     }
     res.json(result);

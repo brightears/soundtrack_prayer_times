@@ -5,6 +5,7 @@ import { CALCULATION_METHODS, PRAYER_SOURCES } from "../aladhan.js";
 import { getSchedulerStatus, refreshZone } from "../scheduler.js";
 import { collectPrayers, collectDurations, collectAdhanPrayers, parseCoord } from "../shared.js";
 import { attachTodayTimings, type DashboardZoneRow } from "../today-times.js";
+import { resolveZoneCoordinates } from "../geocode.js";
 
 const router = Router();
 
@@ -91,6 +92,14 @@ router.post("/zones/create", async (req: Request, res: Response) => {
 
     const durations = collectDurations(b);
     const adhanPrayers = collectAdhanPrayers(b);
+    // Fill coordinates when left blank so accuracy doesn't depend on remembering
+    // to click "Look up from city".
+    const coords = await resolveZoneCoordinates({
+      latitude: parseCoord(b.latitude),
+      longitude: parseCoord(b.longitude),
+      city: b.city,
+      country: b.country,
+    });
     const result = await query(
       `INSERT INTO zone_configs
        (account_id, account_name, location_id, location_name, zone_id, zone_name,
@@ -109,8 +118,8 @@ router.post("/zones/create", async (req: Request, res: Response) => {
         b.zone_name,
         b.city,
         b.country,
-        parseCoord(b.latitude),
-        parseCoord(b.longitude),
+        coords.latitude,
+        coords.longitude,
         b.timezone,
         Number(b.method),
         Number(b.asr_school),
@@ -168,6 +177,12 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
 
     const durations = collectDurations(b);
     const adhanPrayers = collectAdhanPrayers(b);
+    const coords = await resolveZoneCoordinates({
+      latitude: parseCoord(b.latitude),
+      longitude: parseCoord(b.longitude),
+      city: b.city,
+      country: b.country,
+    });
     const result = await query(
       `UPDATE zone_configs SET
         account_id = $1, account_name = $2,
@@ -191,8 +206,8 @@ router.post("/zones/:id/update", async (req: Request, res: Response) => {
         b.zone_name,
         b.city,
         b.country,
-        parseCoord(b.latitude),
-        parseCoord(b.longitude),
+        coords.latitude,
+        coords.longitude,
         b.timezone,
         Number(b.method),
         Number(b.asr_school),

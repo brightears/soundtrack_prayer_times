@@ -77,7 +77,7 @@
         <button type="button" class="btn btn--secondary" id="geocode-btn">Look up from city</button>
       </div>
       <p class="text-muted" id="geocode-hint" style="margin-top: var(--space-1); font-size: 0.8rem;">
-        Recommended. When set, prayer times are calculated from these exact coordinates instead of the city name (which some locations geocode incorrectly).
+        Prayer times are calculated from these exact coordinates (more accurate than the city name alone). Leave blank and they'll be filled in automatically when you save.
       </p>
     </div>
 
@@ -409,10 +409,12 @@
         .then(res => {
           document.getElementById('latitude').value = res.latitude;
           document.getElementById('longitude').value = res.longitude;
-          hint.textContent = 'Found: ' + res.displayName + '  (' + Number(res.latitude).toFixed(4) + ', ' + Number(res.longitude).toFixed(4) + ')';
+          hint.style.color = 'var(--color-success)';
+          hint.textContent = '✓ Found ' + res.displayName + ' (' + Number(res.latitude).toFixed(4) + ', ' + Number(res.longitude).toFixed(4) + ')';
         })
         .catch(err => {
-          hint.textContent = 'Lookup failed: ' + ((err && err.error) ? err.error : 'try again or enter coordinates manually.');
+          hint.style.color = 'var(--color-error)';
+          hint.textContent = 'Lookup failed — ' + ((err && err.error) ? err.error : 'no response from the lookup service. Coordinates will be filled in automatically when you save, or type them in above.');
         })
         .finally(() => {
           geocodeBtn.classList.remove('btn--loading');
