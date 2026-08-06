@@ -3,7 +3,11 @@ import { query } from "./db.js";
 import { graphql } from "./soundtrack.js";
 import { PLAY, PAUSE, ASSIGN_SOURCE, ZONE_PLAY_FROM } from "./queries.js";
 import { fetchTimings, type PrayerName, PRAYER_NAMES } from "./aladhan.js";
-import { clampPauseDuration, MAX_PAUSE_MINUTES } from "./shared.js";
+import {
+  clampPauseDuration,
+  MAX_PAUSE_MINUTES,
+  resolveAdhanLeadSeconds,
+} from "./shared.js";
 
 interface ZoneConfig {
   id: number;
@@ -25,6 +29,7 @@ interface ZoneConfig {
   adhan_enabled: boolean;
   adhan_source_id: string | null;
   adhan_lead_minutes: number;
+  adhan_lead_seconds: number;
   default_source_id: string | null;
   adhan_prayers: string;
 }
@@ -344,9 +349,13 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
 
     if (useAdhan) {
       // --- Adhan flow: assign adhan → pause → restore default source ---
-      const adhanTime = new Date(
-        prayerTime.getTime() - config.adhan_lead_minutes * 60_000
+      // The adhan plays for exactly the lead time before the pause, so the lead is
+      // stored as minutes + seconds to match a track's real length (e.g. 2:32).
+      const adhanLeadSeconds = resolveAdhanLeadSeconds(
+        config.adhan_lead_minutes,
+        config.adhan_lead_seconds
       );
+      const adhanTime = new Date(prayerTime.getTime() - adhanLeadSeconds * 1000);
 
       // Schedule adhan: assign call-to-prayer playlist before prayer
       if (adhanTime.getTime() > nowMs) {
@@ -367,6 +376,15 @@ async function scheduleZone(config: ZoneConfig): Promise<void> {
               zoneId: config.zone_id,
               sourceId: config.adhan_source_id!,
             });
+            // If retries pushed us past the prayer time, the pause has likely already
+            // fired — playing now would un-pause the zone during the prayer itself.
+            if (Date.now() >= prayerTime.getTime()) {
+              await logAction(
+                config.id, config.zone_id, "adhan", prayer, adhanTime, false,
+                "Skipped play: the adhan step ran past the prayer time (slow Soundtrack API); left paused for the prayer"
+              );
+              return;
+            }
             await executeWithRetry(PLAY, { soundZone: config.zone_id });
             await logAction(config.id, config.zone_id, "adhan", prayer, adhanTime, true);
           } catch (err) {

@@ -249,10 +249,20 @@
       </div>
 
       <div class="field">
-        <label class="field__label">Lead Time (minutes before prayer)</label>
-        <input type="number" name="adhan_lead_minutes" class="field__input"
-          min="1" max="15" value="<%= zone ? zone.adhan_lead_minutes : 5 %>"
-          style="width: 8rem;">
+        <label class="field__label">Lead Time before prayer (min : sec)</label>
+        <div style="display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;">
+          <input type="number" name="adhan_lead_minutes" id="adhan-lead-min" class="field__input"
+            min="0" max="30" value="<%= zone ? zone.adhan_lead_minutes : 5 %>"
+            style="width: 5rem;" aria-label="Lead minutes">
+          <span class="text-muted">:</span>
+          <input type="number" name="adhan_lead_seconds" id="adhan-lead-sec" class="field__input"
+            min="0" max="59" value="<%= zone && zone.adhan_lead_seconds != null ? zone.adhan_lead_seconds : 0 %>"
+            style="width: 5rem;" aria-label="Lead seconds">
+          <button type="button" class="btn btn--secondary" id="track-length-btn">Use track length</button>
+        </div>
+        <p class="text-muted" id="lead-hint" style="margin-top: var(--space-1); font-size: 0.8rem;">
+          The call to prayer plays for exactly this long before the prayer pause starts — set it to your adhan track's length so it finishes cleanly (e.g. 2 : 32). "Use track length" reads it from the selected playlist.
+        </p>
       </div>
     </div>
   </div>
@@ -391,6 +401,56 @@
         if (defaultIdFallback) defaultIdFallback(savedDefault);
       })
       .catch(() => {});
+  }
+
+  // "Use track length" — reads the selected adhan playlist's real duration and sets
+  // the lead time to it, so the track finishes exactly as the prayer pause starts.
+  const trackLenBtn = document.getElementById('track-length-btn');
+  if (trackLenBtn) {
+    trackLenBtn.addEventListener('click', () => {
+      const hint = document.getElementById('lead-hint');
+      const idInput = document.getElementById('adhan-source-id');
+      const sel = document.getElementById('adhan-source');
+      const sourceId = (idInput && !idInput.disabled ? idInput.value : sel ? sel.value : '').trim();
+      if (!sourceId) {
+        hint.style.color = 'var(--color-error)';
+        hint.textContent = 'Choose an Adhan Playlist first, then click "Use track length".';
+        return;
+      }
+      trackLenBtn.classList.add('btn--loading');
+      trackLenBtn.disabled = true;
+      fetch('<%= basePath %>/api/soundtrack/playlist-duration?id=' + encodeURIComponent(sourceId))
+        .then(r => r.json().then(body => (r.ok ? body : Promise.reject(body))))
+        .then(res => {
+          // Round UP so a 2:32.4 track isn't clipped, and clamp to the 30-minute max
+          // the inputs accept (a long multi-track playlist would otherwise write a
+          // value the browser refuses to submit).
+          const rawSec = Math.ceil(res.totalMs / 1000);
+          const totalSec = Math.min(rawSec, 1800);
+          const mmss = s => Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+          document.getElementById('adhan-lead-min').value = Math.floor(totalSec / 60);
+          document.getElementById('adhan-lead-sec').value = totalSec % 60;
+          hint.style.color = 'var(--color-success)';
+          let msg = '✓ "' + res.name + '" — ' + res.trackCount + ' track(s), ' + mmss(rawSec);
+          if (rawSec > totalSec) {
+            msg += '. Capped at 30:00 — use a playlist with just the adhan track.';
+          } else if (res.trackCount > 1) {
+            msg += ' total (first track ' + mmss(Math.ceil(res.firstTrackMs / 1000)) + '). Set to the whole playlist; for a single adhan use a one-track playlist.';
+          } else {
+            msg += '. Lead time set to match.';
+          }
+          if (res.truncated) msg += ' (first 100 tracks only)';
+          hint.textContent = msg;
+        })
+        .catch(err => {
+          hint.style.color = 'var(--color-error)';
+          hint.textContent = (err && err.error) ? err.error : 'Could not read the track length — set the time manually.';
+        })
+        .finally(() => {
+          trackLenBtn.classList.remove('btn--loading');
+          trackLenBtn.disabled = false;
+        });
+    });
   }
 
   // Coordinate lookup from city / country (OpenStreetMap)

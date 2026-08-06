@@ -5,6 +5,7 @@ import { LOCATION_SOUND_ZONES, ACCOUNT_LIBRARY } from "../queries.js";
 import { testZone, refreshZone } from "../scheduler.js";
 import { portalAuth } from "../middleware/portal-auth.js";
 import { geocodeCity } from "../geocode.js";
+import { playlistDuration } from "./api.js";
 
 const router = Router();
 
@@ -30,6 +31,55 @@ async function verifyOwnership(zoneConfigId: string, accountId: string): Promise
   );
   return result.rows.length > 0;
 }
+
+// ── Playlist duration (for setting the adhan lead time to the track length) ──
+
+router.get(
+  "/:token/api/soundtrack/playlist-duration",
+  wrap(async (req, res) => {
+    const customer = req.customer!;
+    const playlistId = (req.query.id as string) || "";
+    if (!playlistId) {
+      res.status(400).json({ error: "id is required" });
+      return;
+    }
+
+    // Scope to the caller's own account — the SYB token is a shared master token, so
+    // an unscoped lookup would expose other customers' playlists (every other portal
+    // Soundtrack route is account-scoped; this must match).
+    const library = await graphql<{
+      account: {
+        musicLibrary: {
+          playlists: { edges: Array<{ node: { id: string } }> };
+          schedules: { edges: Array<{ node: { id: string } }> };
+        };
+      };
+    }>(ACCOUNT_LIBRARY, { accountId: customer.account_id });
+    const owned = new Set(
+      [
+        ...extractNodes(library.data!.account.musicLibrary.playlists),
+        ...extractNodes(library.data!.account.musicLibrary.schedules),
+      ].map((n) => n.id)
+    );
+    if (!owned.has(playlistId)) {
+      res.status(404).json({ error: "Playlist not found in your account" });
+      return;
+    }
+
+    try {
+      res.json(await playlistDuration(playlistId));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const status = /not found/i.test(msg) ? 404 : 503;
+      res.status(status).json({
+        error:
+          status === 404
+            ? "Couldn't read that playlist's length — it may be a schedule rather than a playlist. Set the time manually."
+            : `Soundtrack is not responding right now — try again, or set the time manually. (${msg})`,
+      });
+    }
+  })
+);
 
 // ── Zone Test ────────────────────────────────────────────────────────────
 

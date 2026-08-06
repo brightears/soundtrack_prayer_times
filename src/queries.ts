@@ -100,6 +100,23 @@ query ZonePlayFrom($zoneId: ID!) {
   }
 }`;
 
+// Track durations for a playlist — used to set the adhan lead time to the exact
+// length of the call-to-prayer track, so it finishes just as the prayer pause starts.
+export const PLAYLIST_TRACK_DURATIONS = `
+query PlaylistTrackDurations($playlistId: ID!) {
+  playlist(id: $playlistId) {
+    id
+    name
+    tracks(first: 100) {
+      edges {
+        node {
+          durationMs
+        }
+      }
+    }
+  }
+}`;
+
 // Query for fetching an account's music library (playlists + schedules)
 export const ACCOUNT_LIBRARY = `
 query AccountLibrary($accountId: ID!) {

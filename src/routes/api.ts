@@ -7,7 +7,9 @@ import {
   ACCOUNT_LOCATIONS,
   LOCATION_SOUND_ZONES,
   ACCOUNT_LIBRARY,
+  PLAYLIST_TRACK_DURATIONS,
 } from "../queries.js";
+import { parseLeadSeconds, parseLeadMinutes } from "../shared.js";
 import { refreshZone, refreshAllSchedules, testZone } from "../scheduler.js";
 import { geocodeCity } from "../geocode.js";
 
@@ -75,6 +77,7 @@ router.post(
       adhan_enabled,
       adhan_source_id,
       adhan_lead_minutes,
+      adhan_lead_seconds,
       default_source_id,
       prayer_source,
       adhan_prayers,
@@ -88,8 +91,8 @@ router.post(
         city, country, latitude, longitude, timezone, method, asr_school,
         prayers, pause_offset_minutes, pause_durations, mode, enabled,
         adhan_enabled, adhan_source_id, adhan_lead_minutes, default_source_id,
-        prayer_source, adhan_prayers)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+        prayer_source, adhan_prayers, adhan_lead_seconds)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
        RETURNING *`,
       [
         account_id,
@@ -112,10 +115,11 @@ router.post(
         enabled ?? true,
         adhan_enabled ?? false,
         adhan_source_id || null,
-        adhan_lead_minutes ?? 5,
+        parseLeadMinutes(adhan_lead_minutes),
         default_source_id || null,
         prayer_source || "aladhan",
         adhan_prayers ?? "Fajr,Dhuhr,Asr,Maghrib,Isha",
+        parseLeadSeconds(adhan_lead_seconds),
       ]
     );
 
@@ -149,6 +153,7 @@ router.put(
       adhan_enabled,
       adhan_source_id,
       adhan_lead_minutes,
+      adhan_lead_seconds,
       default_source_id,
       prayer_source,
       adhan_prayers,
@@ -163,8 +168,9 @@ router.put(
         adhan_enabled = $13, adhan_source_id = $14,
         adhan_lead_minutes = $15, default_source_id = $16,
         prayer_source = $17, adhan_prayers = $18,
+        adhan_lead_seconds = $19,
         updated_at = NOW()
-       WHERE id = $19 RETURNING *`,
+       WHERE id = $20 RETURNING *`,
       [
         city,
         country,
@@ -180,10 +186,11 @@ router.put(
         enabled,
         adhan_enabled ?? false,
         adhan_source_id || null,
-        adhan_lead_minutes ?? 5,
+        parseLeadMinutes(adhan_lead_minutes),
         default_source_id || null,
         prayer_source || "aladhan",
         adhan_prayers ?? "Fajr,Dhuhr,Asr,Maghrib,Isha",
+        parseLeadSeconds(adhan_lead_seconds),
         req.params.id,
       ]
     );
@@ -423,6 +430,64 @@ router.get(
       playlists: extractNodes(library.playlists).sort(byName),
       schedules: extractNodes(library.schedules).sort(byName),
     });
+  })
+);
+
+// ── Playlist duration (for setting the adhan lead time to the track length) ──
+
+interface PlaylistDurationData {
+  playlist: {
+    id: string;
+    name: string;
+    tracks: { edges: Array<{ node: { durationMs: number | null } }> };
+  } | null;
+}
+
+export async function playlistDuration(playlistId: string): Promise<{
+  name: string;
+  trackCount: number;
+  totalMs: number;
+  firstTrackMs: number;
+  truncated: boolean;
+}> {
+  const result = await graphql<PlaylistDurationData>(PLAYLIST_TRACK_DURATIONS, {
+    playlistId,
+  });
+  const playlist = result.data?.playlist;
+  if (!playlist) throw new Error("Playlist not found");
+
+  const durations = playlist.tracks.edges.map((e) => e.node.durationMs ?? 0);
+  return {
+    name: playlist.name,
+    trackCount: durations.length,
+    totalMs: durations.reduce((sum, ms) => sum + ms, 0),
+    firstTrackMs: durations[0] ?? 0,
+    // The query asks for the first 100 tracks; flag when the total may be partial.
+    truncated: durations.length >= 100,
+  };
+}
+
+// A genuine "no such playlist" is a 404; anything else (API down, bad token) is a
+// service failure and must not be reported to the user as their mistake.
+function playlistErrorStatus(err: unknown): number {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /not found/i.test(msg) ? 404 : 503;
+}
+
+router.get(
+  "/soundtrack/playlists/:playlistId/duration",
+  wrap(async (req, res) => {
+    try {
+      res.json(await playlistDuration(req.params.playlistId as string));
+    } catch (err) {
+      const status = playlistErrorStatus(err);
+      res.status(status).json({
+        error:
+          status === 404
+            ? "Couldn't read that playlist's length — it may be a schedule rather than a playlist. Set the time manually."
+            : `Soundtrack is not responding right now — try again, or set the time manually. (${err instanceof Error ? err.message : String(err)})`,
+      });
+    }
   })
 );
 
