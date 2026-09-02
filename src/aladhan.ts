@@ -25,30 +25,33 @@ export const PRAYER_NAMES = [
 
 export type PrayerName = (typeof PRAYER_NAMES)[number];
 
-// Calculation methods supported by Aladhan
+// Calculation methods, keyed by the id Aladhan actually uses (GET /v1/methods).
+// The id is sent straight to the API, so a wrong key here silently computes with a
+// different authority: this map was once off by one for ids >= 7 (migration 008).
 export const CALCULATION_METHODS: Record<number, string> = {
-  0: "Shia Ithna-Ansari",
+  0: "Shia Ithna-Ashari, Leva Institute, Qum",
   1: "University of Islamic Sciences, Karachi",
   2: "Islamic Society of North America (ISNA)",
   3: "Muslim World League",
   4: "Umm Al-Qura University, Makkah",
   5: "Egyptian General Authority of Survey",
-  7: "Gulf Region",
-  8: "Kuwait",
-  9: "Qatar",
-  10: "Majlis Ugama Islam Singapura",
-  11: "Union Organization Islamic de France",
-  12: "Diyanet Isleri Baskanligi, Turkey",
-  13: "Spiritual Administration of Muslims of Russia",
-  14: "Institute of Geophysics, University of Tehran",
-  15: "Shia: Leva Research Institute, Qum",
-  16: "JAKIM (Malaysia)",
-  17: "Tunisia",
-  18: "Algeria",
-  19: "KEMENAG (Indonesia)",
-  20: "Morocco",
-  21: "Comunidade Islamica de Lisboa",
-  22: "Ministry of Awqaf, Islamic Affairs and Holy Places, Jordan",
+  7: "Institute of Geophysics, University of Tehran",
+  8: "Gulf Region",
+  9: "Kuwait",
+  10: "Qatar",
+  11: "Majlis Ugama Islam Singapura, Singapore",
+  12: "Union Organization Islamic de France",
+  13: "Diyanet Isleri Baskanligi, Turkey",
+  14: "Spiritual Administration of Muslims of Russia",
+  15: "Moonsighting Committee Worldwide",
+  16: "Dubai",
+  17: "Jabatan Kemajuan Islam Malaysia (JAKIM)",
+  18: "Tunisia",
+  19: "Algeria",
+  20: "Kementerian Agama Republik Indonesia (KEMENAG)",
+  21: "Morocco",
+  22: "Comunidade Islamica de Lisboa",
+  23: "Ministry of Awqaf, Islamic Affairs and Holy Places, Jordan",
 };
 
 interface AladhanTimingsResponse {
@@ -193,8 +196,11 @@ async function fetchFromAladhan(
 // ── PrayCalendar provider ───────────────────────────────────────────────
 
 interface PrayCalendarResponse {
-  date: string;
-  prayer_times: {
+  date?: unknown;
+  // Current API shape: capitalised keys under `timings`.
+  timings?: Record<string, string>;
+  // Legacy shape this client was originally written against.
+  prayer_times?: {
     fajr: string;
     sunrise: string;
     dhuhr: string;
@@ -204,30 +210,33 @@ interface PrayCalendarResponse {
   };
 }
 
-// Map Aladhan method numbers to PrayCalendar method names
+// Map Aladhan method ids to PrayCalendar method names. Note PrayCalendar appears to
+// ignore the method parameter entirely (same times for any name), so Aladhan should
+// remain the recommended source for method-sensitive venues.
 const PRAYCALENDAR_METHODS: Record<number, string> = {
-  0: "Shia", // closest match
+  0: "Shia",
   1: "Karachi",
   2: "ISNA",
   3: "MWL",
   4: "Makkah",
   5: "Egypt",
-  7: "Gulf",
-  8: "Kuwait",
-  9: "Qatar",
-  10: "Singapore",
-  11: "France",
-  12: "Turkey",
-  13: "Russia",
-  14: "Tehran",
-  15: "Shia",
-  16: "JAKIM",
-  17: "Tunisia",
-  18: "Algeria",
-  19: "KEMENAG",
-  20: "Morocco",
-  21: "Portugal",
-  22: "Jordan",
+  7: "Tehran",
+  8: "Gulf",
+  9: "Kuwait",
+  10: "Qatar",
+  11: "Singapore",
+  12: "France",
+  13: "Turkey",
+  14: "Russia",
+  15: "MWL",  // Moonsighting Committee: no PrayCalendar equivalent
+  16: "Gulf", // Dubai: closest PrayCalendar method
+  17: "JAKIM",
+  18: "Tunisia",
+  19: "Algeria",
+  20: "KEMENAG",
+  21: "Morocco",
+  22: "Portugal",
+  23: "Jordan",
 };
 
 async function fetchFromPrayCalendar(
@@ -243,17 +252,20 @@ async function fetchFromPrayCalendar(
   const response = await fetchWithRetry(url.toString());
   const json = (await response.json()) as PrayCalendarResponse;
 
-  if (!json.prayer_times) {
+  if (json.timings) {
+    return extractTimings(json.timings);
+  }
+  const legacy = json.prayer_times;
+  if (!legacy) {
     throw new Error("PrayCalendar API returned no prayer times");
   }
-
   return {
-    Fajr: json.prayer_times.fajr,
-    Sunrise: json.prayer_times.sunrise,
-    Dhuhr: json.prayer_times.dhuhr,
-    Asr: json.prayer_times.asr,
-    Maghrib: json.prayer_times.maghrib,
-    Isha: json.prayer_times.isha,
+    Fajr: legacy.fajr,
+    Sunrise: legacy.sunrise,
+    Dhuhr: legacy.dhuhr,
+    Asr: legacy.asr,
+    Maghrib: legacy.maghrib,
+    Isha: legacy.isha,
   };
 }
 
